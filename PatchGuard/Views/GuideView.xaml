@@ -1,0 +1,227 @@
+<UserControl x:Class="PatchGuard.Views.GuideView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:PatchGuard.Converters"
+             xmlns:models="clr-namespace:PatchGuard.Models"
+             xmlns:vm="clr-namespace:PatchGuard.ViewModels"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="700" d:DesignWidth="1100">
+    <UserControl.Resources>
+        <conv:NullToVisibilityConverter x:Key="NullVis"/>
+        <conv:InverseBoolConverter x:Key="InverseBool"/>
+        <conv:SeverityToBarBrushConverter x:Key="BarBrush"/>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,32">
+            <StackPanel>
+                <TextBlock Text="AI Council" Style="{StaticResource HeadingText}" Margin="0,0,0,12"/>
+                <TextBlock Text="{Binding Summary}" Style="{StaticResource SubtleText}" MaxWidth="640"/>
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,0">
+                <TextBlock Text="Health" Style="{StaticResource MetricLabel}" HorizontalAlignment="Right" Margin="0,0,0,6"/>
+                <TextBlock Text="{Binding HealthScore}" FontSize="36" FontWeight="Bold"
+                           Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
+                <TextBlock Text="/ 100" Style="{StaticResource MetricLabel}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Phase stepper -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding PhaseSteps}" Margin="0,0,0,32">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:CouncilPhaseStep}">
+                    <Border Margin="0,0,16,0" Padding="16,14" CornerRadius="6"
+                            Background="{StaticResource CardBackgroundBrush}"
+                            BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding Name}" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Agent panels -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding AgentPanels}" Margin="0,0,0,36">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:AgentPanelState}">
+                    <Border Style="{StaticResource AgentPanel}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" Foreground="{StaticResource AccentBrush}" FontSize="16" Margin="0,0,10,0"/>
+                                    <TextBlock Text="{Binding Role}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding PhaseLabel}" HorizontalAlignment="Right" Style="{StaticResource MetricLabel}"/>
+                            </Grid>
+                            <ProgressBar Style="{StaticResource AccentProgressBar}" Maximum="100" Value="{Binding Confidence}"/>
+                            <TextBlock Text="{Binding Headline}" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextMutedBrush}" FontSize="13" LineHeight="20"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="0,0,12,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300"/>
+                    <ColumnDefinition Width="40"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Metrics column -->
+                <Border Grid.Column="0" Style="{StaticResource DashboardPanel}" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Scan metrics" Style="{StaticResource SectionHeader}"/>
+                        <ItemsControl ItemsSource="{Binding ScanMetrics}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:ScanMetric}">
+                                    <StackPanel Margin="0,0,0,22">
+                                        <Grid>
+                                            <TextBlock Text="{Binding Label}" Style="{StaticResource MetricLabel}"/>
+                                            <TextBlock Text="{Binding Value}" Style="{StaticResource MetricValue}"/>
+                                        </Grid>
+                                        <ProgressBar Style="{StaticResource AccentProgressBar}"
+                                                     Maximum="100" Value="{Binding BarPercent}"
+                                                     Foreground="{Binding Severity, Converter={StaticResource BarBrush}}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Border Background="#1E1E24" CornerRadius="6" Padding="18" Margin="0,8,0,0"
+                                Visibility="{Binding IsCouncilRunning, Converter={StaticResource BoolVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="●" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" FontSize="14"/>
+                                <TextBlock Text="{Binding CouncilStatus}" Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontSize="13" TextWrapping="Wrap" LineHeight="20"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Main content column -->
+                <StackPanel Grid.Column="2">
+                    <Border Style="{StaticResource DashboardPanel}" BorderBrush="{StaticResource AccentBrush}" Margin="0,0,0,28">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,20">
+                                <TextBlock Text="Verdict" Style="{StaticResource SectionHeader}" Margin="0"/>
+                                <Button Content="Copy verdict" Style="{StaticResource SecondaryButton}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Command="{Binding CopyChiefVerdictCommand}"
+                                        Visibility="{Binding ChiefVerdict, Converter={StaticResource NullVis}}"/>
+                            </Grid>
+                            <TextBlock Text="{Binding ChiefVerdict}" TextWrapping="Wrap" LineHeight="24"
+                                       Foreground="{StaticResource TextPrimaryBrush}" FontSize="14"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource DashboardPanel}" Margin="0,0,0,28">
+                        <StackPanel>
+                            <TextBlock Text="Transcript" Style="{StaticResource SectionHeader}"/>
+                            <ItemsControl ItemsSource="{Binding CouncilMessages}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:CouncilMessage}">
+                                        <Border Background="#1E1E24" CornerRadius="6" Padding="20" Margin="0,0,0,16">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,14">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding AgentRole}" FontWeight="Bold"
+                                                                   Foreground="{StaticResource AccentBrush}" FontSize="13"/>
+                                                        <TextBlock Text="{Binding Phase}" Margin="12,0,0,0" Style="{StaticResource MetricLabel}"/>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Headline}" HorizontalAlignment="Right"
+                                                               MaxWidth="220" TextTrimming="CharacterEllipsis"
+                                                               Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Content}" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           FontSize="13" LineHeight="22"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource DashboardPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Steps" Style="{StaticResource SectionHeader}"/>
+                            <ItemsControl ItemsSource="{Binding FixSteps}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:FixStep}">
+                                        <Grid Margin="0,0,0,24">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Order}" FontWeight="Bold" FontSize="16"
+                                                       Foreground="{StaticResource AccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                                                <TextBlock Text="{Binding Instructions}" TextWrapping="Wrap"
+                                                           Style="{StaticResource SubtleText}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                                    <Button Content="Open" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0"
+                                                            Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding LinkUrl}"
+                                                            Visibility="{Binding LinkUrl, Converter={StaticResource NullVis}}"/>
+                                                    <Button Content="Copy" Style="{StaticResource SecondaryButton}"
+                                                            Command="{Binding DataContext.CopyTextCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding CopyText}"
+                                                            Visibility="{Binding CopyText, Converter={StaticResource NullVis}}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF453A" TextWrapping="Wrap"
+                               Margin="0,20,0,0" Visibility="{Binding ErrorMessage, Converter={StaticResource NullVis}}"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <Button Grid.Row="4" Content="Done" Style="{StaticResource PrimaryButton}"
+                HorizontalAlignment="Right" Margin="0,36,0,0"
+                Command="{Binding DoneCommand}"
+                IsEnabled="{Binding IsCouncilRunning, Converter={StaticResource InverseBool}}"/>
+    </Grid>
+</UserControl>

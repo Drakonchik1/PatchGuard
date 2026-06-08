@@ -1,0 +1,19 @@
+## Build
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+## Secrets & local config
+appsettings.Development.json
+**/appsettings.Development.json
+
+## Local database
+*.db
+*.db-shm
+*.db-wal
+
+## OS
+Thumbs.db
+.DS_Store

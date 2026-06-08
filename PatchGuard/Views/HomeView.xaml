@@ -1,0 +1,118 @@
+<UserControl x:Class="PatchGuard.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:PatchGuard.Converters"
+             xmlns:models="clr-namespace:PatchGuard.Models"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="600" d:DesignWidth="1000">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+        <conv:InverseBoolConverter x:Key="InverseBool"/>
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource PageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,40">
+            <StackPanel>
+                <TextBlock Text="Home" Style="{StaticResource HeadingText}" Margin="0,0,0,12"/>
+                <TextBlock Style="{StaticResource SubtleText}">
+                    <Run Text="PC: "/>
+                    <Run Text="{Binding MachineLabel, Mode=OneWay}" Foreground="#F2F2F7"/>
+                    <Run Text=" — read-only scans, manual fixes only."/>
+                </TextBlock>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="420"/>
+                <ColumnDefinition Width="40"/>
+                <ColumnDefinition Width="340" MaxWidth="380"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Scenarios -->
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Scan scenarios" Style="{StaticResource SectionHeader}"/>
+
+                <ItemsControl ItemsSource="{Binding Scenarios}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:ScenarioOption}">
+                            <Border Style="{StaticResource CardBorder}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,32,0">
+                                        <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Style="{StaticResource SubtleText}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Start scan"
+                                            Style="{StaticResource PrimaryButton}"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding DataContext.StartScanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Scan history (new) -->
+            <Border Grid.Column="2" Style="{StaticResource DashboardPanel}" VerticalAlignment="Top">
+                <StackPanel>
+                    <TextBlock Text="Scan history" Style="{StaticResource SectionHeader}" Margin="0,0,0,8"/>
+                    <TextBlock Text="Health trend after updates."
+                               Style="{StaticResource SubtleText}" Margin="0,0,0,24"/>
+
+                    <ItemsControl ItemsSource="{Binding RecentScans}"
+                                  Visibility="{Binding HasScanHistory, Converter={StaticResource BoolVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type models:ScanHistoryEntry}">
+                                <Border Background="#1E1E24" CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,14">
+                                            <TextBlock Text="{Binding ScenarioTitle}" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
+                                            <TextBlock Text="{Binding ScannedAt, StringFormat='{}{0:g}'}"
+                                                       HorizontalAlignment="Right" Style="{StaticResource MetricLabel}"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,8">
+                                            <TextBlock Text="Health" Style="{StaticResource MetricLabel}"/>
+                                            <TextBlock Text="{Binding HealthScore}" Style="{StaticResource MetricValue}"
+                                                       Foreground="{StaticResource AccentBrush}"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,8">
+                                            <TextBlock Text="Warnings" Style="{StaticResource MetricLabel}"/>
+                                            <TextBlock Text="{Binding WarningCount}" Style="{StaticResource MetricValue}"/>
+                                        </Grid>
+                                        <Grid>
+                                            <TextBlock Text="Trend" Style="{StaticResource MetricLabel}"/>
+                                            <TextBlock Text="{Binding TrendLabel}" Style="{StaticResource MetricValue}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Background="#1E1E24" CornerRadius="6" Padding="24"
+                            Visibility="{Binding HasScanHistory, Converter={StaticResource InverseBool}}">
+                        <TextBlock Text="No scans yet."
+                                   Style="{StaticResource SubtleText}" TextAlignment="Center"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
