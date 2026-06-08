@@ -15,13 +15,7 @@ dotnet run --project PatchGuard
 |----------|----------------|
 | After Windows Update | Disk, updates, services, event log |
 | Quick health check | OS build and free disk space |
-| Game FPS check | GPU, RAM, synthetic render test, in-game FPS log |
 
-### Game FPS workflow
-
-1. Run **Game FPS check** — quick render benchmark compares to your last run.
-2. On the findings screen, log **in-game FPS** (same game, same settings each time).
-3. After driver or Windows changes, run again and compare both numbers.
 
 ## AI council
 
