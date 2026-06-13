@@ -240,9 +240,18 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
             return;
         }
 
+        // The URL comes from AI/web output, so only open well-formed http(s)
+        // links — never arbitrary schemes (file:, javascript:, custom handlers).
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            ErrorMessage = "Blocked a link that was not a standard http/https web address.";
+            return;
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }
         catch (Exception ex)
         {

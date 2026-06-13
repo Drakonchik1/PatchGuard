@@ -6,9 +6,13 @@ using PatchGuard.Data;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
 using PatchGuard.Services.Diagnostics;
+using PatchGuard.Services.Hardware;
 using PatchGuard.Services.History;
 using PatchGuard.Services.Navigation;
+using PatchGuard.Services.Optimization;
+using PatchGuard.Services.Optimization.Steps;
 using PatchGuard.Services.Performance;
+using PatchGuard.Services.Platform;
 using PatchGuard.ViewModels;
 
 namespace PatchGuard;
@@ -44,27 +48,44 @@ public static class DependencyInjection
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<IViewModelHost>(sp => sp.GetRequiredService<MainViewModel>());
         services.AddSingleton<INavigationService, NavigationService>();
-        services.AddSingleton<ISyntheticBenchmarkRunner, SyntheticBenchmarkRunner>();
-        services.AddSingleton<IGameFpsService, GameFpsService>();
 
+        // Platform + hardware services
+        services.AddSingleton<IAdminElevationService, AdminElevationService>();
+        services.AddSingleton<IHardwareMonitorService, LibreHardwareMonitorService>();
+        services.AddSingleton<IFpsCaptureService, PresentMonFpsCaptureService>();
+
+        // Optimizer steps run in registration order.
+        services.AddSingleton<IOptimizationStep, WorkingSetTrimStep>();
+        services.AddSingleton<IOptimizationStep, TempFilesCleanStep>();
+        services.AddSingleton<IOptimizationStep, RecycleBinStep>();
+        services.AddSingleton<IOptimizationStep, DnsFlushStep>();
+        services.AddSingleton<IOptimizationStep, ExplorerRestartStep>();
+        services.AddSingleton<ISystemOptimizerService, SystemOptimizerService>();
+
+        // Diagnostic modules (registration order is the scan/display order).
         services.AddSingleton<IDiagnosticModule, OsInfoDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, DiskSpaceDiagnosticModule>();
+        services.AddSingleton<IDiagnosticModule, MemoryLoadDiagnosticModule>();
+        services.AddSingleton<IDiagnosticModule, TemperatureDiagnosticModule>();
+        services.AddSingleton<IDiagnosticModule, CpuLoadDiagnosticModule>();
+        services.AddSingleton<IDiagnosticModule, GpuInfoDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, WindowsUpdateHistoryDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, EventLogDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, UpdateServicesDiagnosticModule>();
-        services.AddSingleton<IDiagnosticModule, GpuInfoDiagnosticModule>();
-        services.AddSingleton<IDiagnosticModule, MemoryLoadDiagnosticModule>();
-        services.AddSingleton<IDiagnosticModule, SyntheticBenchmarkDiagnosticModule>();
 
         services.AddSingleton<IDiagnosticOrchestrator, DiagnosticOrchestrator>();
         services.AddSingleton<IWebSearchService, TavilyWebSearchService>();
         services.AddSingleton<IAiCouncilService, AiCouncilService>();
         services.AddSingleton<IScanHistoryService, ScanHistoryService>();
+        services.AddSingleton<IPerformanceHistoryService, PerformanceHistoryService>();
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ScanViewModel>();
         services.AddTransient<FindingsViewModel>();
         services.AddTransient<GuideViewModel>();
+        services.AddTransient<MonitorViewModel>();
+        services.AddTransient<FpsViewModel>();
+        services.AddTransient<OptimizeViewModel>();
 
         return services;
     }
