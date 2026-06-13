@@ -11,8 +11,8 @@ public sealed class PatchGuardDbContext : DbContext
     }
 
     public DbSet<ScanRecord> ScanRecords => Set<ScanRecord>();
-    public DbSet<BenchmarkRecord> BenchmarkRecords => Set<BenchmarkRecord>();
-    public DbSet<GameFpsEntry> GameFpsEntries => Set<GameFpsEntry>();
+    public DbSet<FpsCaptureRecord> FpsCaptures => Set<FpsCaptureRecord>();
+    public DbSet<OptimizationRunRecord> OptimizationRuns => Set<OptimizationRunRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,36 +23,50 @@ public sealed class PatchGuardDbContext : DbContext
             entity.HasIndex(e => e.ScannedAt);
         });
 
-        modelBuilder.Entity<BenchmarkRecord>(entity =>
+        modelBuilder.Entity<FpsCaptureRecord>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.RecordedAt);
+            entity.Property(e => e.ProcessName).HasMaxLength(256);
+            entity.HasIndex(e => e.CapturedAt);
         });
 
-        modelBuilder.Entity<GameFpsEntry>(entity =>
+        modelBuilder.Entity<OptimizationRunRecord>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.GameName).HasMaxLength(128);
-            entity.HasIndex(e => e.RecordedAt);
+            entity.Property(e => e.Summary).HasMaxLength(512);
+            entity.HasIndex(e => e.RanAt);
         });
     }
 
-    public void EnsureExtendedSchema()
+    /// <summary>
+    /// EnsureCreated() only builds the schema for brand-new databases. For users
+    /// upgrading from an older PatchGuard whose database already exists, this adds
+    /// the new tables in place without touching existing data.
+    /// </summary>
+    public void EnsureUpgradeSchema()
     {
-        Database.ExecuteSqlRaw("""
-            CREATE TABLE IF NOT EXISTS BenchmarkRecords (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                RecordedAt TEXT NOT NULL,
-                SyntheticFps REAL NOT NULL,
-                GpuName TEXT NOT NULL DEFAULT ''
+        const string sql = """
+            CREATE TABLE IF NOT EXISTS "FpsCaptures" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_FpsCaptures" PRIMARY KEY AUTOINCREMENT,
+                "ProcessName" TEXT NOT NULL DEFAULT '',
+                "AverageFps" REAL NOT NULL DEFAULT 0,
+                "OnePercentLowFps" REAL NOT NULL DEFAULT 0,
+                "PointOnePercentLowFps" REAL NOT NULL DEFAULT 0,
+                "FrameCount" INTEGER NOT NULL DEFAULT 0,
+                "CapturedAt" TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS GameFpsEntries (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                GameName TEXT NOT NULL,
-                Fps INTEGER NOT NULL,
-                RecordedAt TEXT NOT NULL,
-                Note TEXT NULL
+            CREATE INDEX IF NOT EXISTS "IX_FpsCaptures_CapturedAt" ON "FpsCaptures" ("CapturedAt");
+
+            CREATE TABLE IF NOT EXISTS "OptimizationRuns" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OptimizationRuns" PRIMARY KEY AUTOINCREMENT,
+                "RanAt" TEXT NOT NULL,
+                "BytesFreed" INTEGER NOT NULL DEFAULT 0,
+                "StepsSucceeded" INTEGER NOT NULL DEFAULT 0,
+                "Summary" TEXT NOT NULL DEFAULT ''
             );
-            """);
+            CREATE INDEX IF NOT EXISTS "IX_OptimizationRuns_RanAt" ON "OptimizationRuns" ("RanAt");
+            """;
+
+        Database.ExecuteSqlRaw(sql);
     }
 }

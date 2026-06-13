@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PatchGuard.Data;
@@ -28,7 +28,7 @@ public partial class App : Application
         {
             var db = scope.ServiceProvider.GetRequiredService<PatchGuardDbContext>();
             db.Database.EnsureCreated();
-            db.EnsureExtendedSchema();
+            db.EnsureUpgradeSchema();
         }
 
         var mainWindow = new MainWindow();
