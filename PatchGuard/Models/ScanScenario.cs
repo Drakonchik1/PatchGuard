@@ -4,6 +4,7 @@ public enum ScanScenario
 {
     AfterWindowsUpdate,
     QuickHealthCheck,
+    FullSystemAudit,
     GamePerformanceCheck
 }
 
@@ -13,18 +14,21 @@ public static class ScanScenarioExtensions
     {
         ScanScenario.AfterWindowsUpdate => "After Windows Update",
         ScanScenario.QuickHealthCheck => "Quick health check",
-        ScanScenario.GamePerformanceCheck => "Game FPS check",
+        ScanScenario.FullSystemAudit => "Full system audit",
+        ScanScenario.GamePerformanceCheck => "Game performance check",
         _ => scenario.ToString()
     };
 
     public static string GetDescription(this ScanScenario scenario) => scenario switch
     {
         ScanScenario.AfterWindowsUpdate =>
-            "Disk, updates, services, event log.",
+            "Scan for common post-update issues: disk space, services, recent errors in logs.",
         ScanScenario.QuickHealthCheck =>
-            "OS build and free disk space only.",
+            "Lightweight system overview — OS build, free disk space, and baseline status.",
+        ScanScenario.FullSystemAudit =>
+            "Everything: OS, disk, services, event logs, temperatures, CPU/GPU, and memory.",
         ScanScenario.GamePerformanceCheck =>
-            "GPU, RAM load, quick render test, compare FPS you log in-game.",
+            "Hardware-focused: temperatures, GPU and driver, CPU load, and available memory for gaming.",
         _ => string.Empty
     };
 }

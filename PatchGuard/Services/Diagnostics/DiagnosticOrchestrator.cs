@@ -15,19 +15,17 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
     {
         return scenario switch
         {
+            ScanScenario.FullSystemAudit => _allModules,
             ScanScenario.AfterWindowsUpdate => _allModules
-                .Where(m => m is not SyntheticBenchmarkDiagnosticModule
-                    and not GpuInfoDiagnosticModule
-                    and not MemoryLoadDiagnosticModule)
+                .Where(m => m is not (TemperatureDiagnosticModule or GpuInfoDiagnosticModule
+                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule))
                 .ToList(),
             ScanScenario.QuickHealthCheck => _allModules
-                .Where(m => m is OsInfoDiagnosticModule or DiskSpaceDiagnosticModule)
+                .Where(m => m is OsInfoDiagnosticModule or DiskSpaceDiagnosticModule or MemoryLoadDiagnosticModule)
                 .ToList(),
             ScanScenario.GamePerformanceCheck => _allModules
-                .Where(m => m is GpuInfoDiagnosticModule
-                    or MemoryLoadDiagnosticModule
-                    or DiskSpaceDiagnosticModule
-                    or SyntheticBenchmarkDiagnosticModule)
+                .Where(m => m is TemperatureDiagnosticModule or GpuInfoDiagnosticModule
+                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule or DiskSpaceDiagnosticModule)
                 .ToList(),
             _ => _allModules
         };
@@ -49,7 +47,7 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
             if (!module.IsImplemented)
             {
                 item.Status = DiagnosticProgressStatus.Skipped;
-                item.Message = "Not available.";
+                item.Message = "Planned for a future release.";
                 progress.Report(item);
                 continue;
             }
@@ -63,7 +61,9 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
                 var findings = await module.RunAsync(cancellationToken);
                 allFindings.AddRange(findings);
                 item.Status = DiagnosticProgressStatus.Completed;
-                item.Message = $"{findings.Count} result(s).";
+                item.Message = findings.Count == 0
+                    ? "No issues reported."
+                    : $"{findings.Count} item(s) recorded.";
             }
             catch (Exception ex)
             {
