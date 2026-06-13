@@ -55,6 +55,42 @@ public static class ScanMetricBuilder
             });
         }
 
+        var memory = findings.FirstOrDefault(f => f.ModuleName == "Memory");
+        if (memory is not null)
+        {
+            metrics.Add(new ScanMetric
+            {
+                Label = "Memory",
+                Value = Trim(memory.Title.Replace("RAM ", string.Empty), 24),
+                BarPercent = memory.Severity >= FindingSeverity.Warning ? 92 : 55,
+                Severity = memory.Severity
+            });
+        }
+
+        foreach (var temp in findings.Where(f => f.ModuleName == "Temperatures" && f.Title.Contains("temperature")))
+        {
+            metrics.Add(new ScanMetric
+            {
+                Label = temp.Title.StartsWith("GPU") ? "GPU temp" : "CPU temp",
+                Value = Trim(temp.Title.Replace(" temperature", string.Empty)
+                    .Replace("CPU ", string.Empty).Replace("GPU ", string.Empty), 12),
+                BarPercent = temp.Severity == FindingSeverity.Critical ? 95 : temp.Severity == FindingSeverity.Warning ? 80 : 45,
+                Severity = temp.Severity
+            });
+        }
+
+        var gpu = findings.FirstOrDefault(f => f.ModuleName == "Graphics card");
+        if (gpu is not null)
+        {
+            metrics.Add(new ScanMetric
+            {
+                Label = "GPU",
+                Value = Trim(gpu.Title, 26),
+                BarPercent = 100,
+                Severity = FindingSeverity.Info
+            });
+        }
+
         var services = findings.Where(f => f.ModuleName == "Update services" && f.Severity >= FindingSeverity.Warning).ToList();
         if (services.Count > 0)
         {

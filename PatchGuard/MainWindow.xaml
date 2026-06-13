@@ -4,39 +4,84 @@
         mc:Ignorable="d"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:conv="clr-namespace:PatchGuard.Converters"
         Title="PatchGuard"
-        Height="780"
-        Width="1120"
-        MinHeight="600"
-        MinWidth="900"
+        Height="800"
+        Width="1180"
+        MinHeight="560"
+        MinWidth="860"
         Background="{StaticResource WindowBackgroundBrush}"
+        TextElement.Foreground="{StaticResource TextPrimaryBrush}"
+        TextElement.FontFamily="Segoe UI"
+        TextOptions.TextFormattingMode="Ideal"
         WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <conv:StringEqualsConverter x:Key="StrEq"/>
+    </Window.Resources>
+
     <DockPanel>
-        <Border DockPanel.Dock="Top"
-                Background="{StaticResource PanelBackgroundBrush}"
+        <!-- Left navigation rail -->
+        <Border DockPanel.Dock="Left"
+                Width="216"
+                Background="{StaticResource NavBackgroundBrush}"
                 BorderBrush="{StaticResource CardBorderBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="48,20">
-            <Grid>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="PatchGuard"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="{StaticResource AccentBrush}"
-                               VerticalAlignment="Center"/>
-                    <TextBlock Text="DESKTOP HEALTH"
-                               Margin="16,0,0,0"
-                               FontSize="11"
-                               Foreground="{StaticResource TextMutedBrush}"
-                               VerticalAlignment="Center"/>
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Brand -->
+                <StackPanel DockPanel.Dock="Top" Margin="24,26,24,28">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="PatchGuard" FontSize="19" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="SYSTEM HEALTH &amp; BOOST" FontSize="10" Margin="0,4,0,0"
+                               Foreground="{StaticResource TextMutedBrush}"/>
                 </StackPanel>
-                <TextBlock Text="Read-only scan · Manual fixes"
-                           HorizontalAlignment="Right"
-                           Style="{StaticResource MetricLabel}"
-                           VerticalAlignment="Center"/>
-            </Grid>
+
+                <!-- Footer note -->
+                <TextBlock DockPanel.Dock="Bottom" Margin="26,0,24,22"
+                           Text="Safe boosts · No Windows settings changed"
+                           TextWrapping="Wrap" FontSize="11"
+                           Foreground="{StaticResource TextMutedBrush}"/>
+
+                <!-- Nav items -->
+                <StackPanel>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Home"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Home, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
+                            <TextBlock Text="Home" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Monitor"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Monitor, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
+                            <TextBlock Text="Live monitor" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Fps"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Fps, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7FC;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
+                            <TextBlock Text="Game FPS" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Optimize"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Optimize, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
+                            <TextBlock Text="Optimize" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
+        <!-- Content host -->
         <ContentControl Content="{Binding CurrentViewModel}"/>
     </DockPanel>
 </Window>

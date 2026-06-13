@@ -21,6 +21,15 @@
             <DataTemplate DataType="{x:Type vm:GuideViewModel}">
                 <views:GuideView/>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:MonitorViewModel}">
+                <views:MonitorView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:FpsViewModel}">
+                <views:FpsView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:OptimizeViewModel}">
+                <views:OptimizeView/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

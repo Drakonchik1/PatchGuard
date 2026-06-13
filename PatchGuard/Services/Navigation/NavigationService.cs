@@ -21,6 +21,7 @@ public sealed class NavigationService : INavigationService
     {
         if (_host.CurrentViewModel is not null)
         {
+            (_host.CurrentViewModel as INavigationLeave)?.OnNavigatedFrom();
             _history.Push(_host.CurrentViewModel);
         }
 
@@ -35,6 +36,7 @@ public sealed class NavigationService : INavigationService
 
     public void NavigateHome()
     {
+        (_host.CurrentViewModel as INavigationLeave)?.OnNavigatedFrom();
         _history.Clear();
         var home = _serviceProvider.GetRequiredService<HomeViewModel>();
         _host.CurrentViewModel = home;
@@ -53,6 +55,7 @@ public sealed class NavigationService : INavigationService
             return;
         }
 
+        (_host.CurrentViewModel as INavigationLeave)?.OnNavigatedFrom();
         _host.CurrentViewModel = _history.Pop();
     }
 }

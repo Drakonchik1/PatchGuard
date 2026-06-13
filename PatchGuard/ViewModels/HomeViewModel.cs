@@ -25,9 +25,10 @@ public partial class HomeViewModel : ObservableObject, INavigationAware
 
         Scenarios =
         [
+            new ScenarioOption { Scenario = ScanScenario.FullSystemAudit },
+            new ScenarioOption { Scenario = ScanScenario.GamePerformanceCheck },
             new ScenarioOption { Scenario = ScanScenario.AfterWindowsUpdate },
-            new ScenarioOption { Scenario = ScanScenario.QuickHealthCheck },
-            new ScenarioOption { Scenario = ScanScenario.GamePerformanceCheck }
+            new ScenarioOption { Scenario = ScanScenario.QuickHealthCheck }
         ];
     }
 
@@ -45,7 +46,8 @@ public partial class HomeViewModel : ObservableObject, INavigationAware
     private async Task LoadHistoryAsync()
     {
         RecentScans.Clear();
-        foreach (var item in await _history.GetRecentScansAsync())
+        var items = await _history.GetRecentScansAsync();
+        foreach (var item in items)
         {
             RecentScans.Add(item);
         }
