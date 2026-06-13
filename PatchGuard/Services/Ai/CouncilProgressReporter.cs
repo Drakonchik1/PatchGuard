@@ -30,7 +30,7 @@ public sealed class CouncilProgressReporter
             {
                 Role = role,
                 PhaseLabel = phaseLabel,
-                Headline = "…",
+                Headline = "Thinking…",
                 Confidence = 0,
                 IsActive = true
             }
@@ -67,7 +67,7 @@ public sealed class CouncilProgressReporter
                 {
                     Role = role,
                     PhaseLabel = "Done",
-                    Headline = "Done",
+                    Headline = "Review complete",
                     Confidence = 0,
                     IsActive = false
                 }
@@ -81,7 +81,7 @@ public sealed class CouncilProgressReporter
         {
             Phase = CouncilPhaseType.Verdict,
             ChiefVerdict = verdict,
-            StatusText = "Verdict ready."
+            StatusText = "Chief Councilor has decided."
         });
     }
 }

@@ -41,11 +41,11 @@ public sealed class DiskSpaceDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = $"C: has {freeGb:F1} GB free of {totalGb:F0} GB",
                 Details = severity == FindingSeverity.Warning
-                    ? "Under 10 GB — updates may fail."
-                    : "Enough for updates.",
+                    ? "Windows updates and rollback files need free space. Less than 10 GB can cause failed updates."
+                    : "Free space looks adequate for routine updates.",
                 Severity = severity,
                 Recommendation = severity == FindingSeverity.Warning
-                    ? "Settings → Storage → free space."
+                    ? "Free up space via Settings → System → Storage before installing large updates."
                     : null
             });
         }

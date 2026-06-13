@@ -28,7 +28,7 @@ public sealed class EventLogDiagnosticModule : IDiagnosticModule
             {
                 ModuleName = Name,
                 Title = "No recent critical errors",
-                Details = $"No errors in last {Lookback.TotalHours:F0}h.",
+                Details = $"No Error/Critical events in System or Application logs within the last {Lookback.TotalHours:F0} hours.",
                 Severity = FindingSeverity.Info
             });
         }

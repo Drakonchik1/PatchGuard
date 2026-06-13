@@ -10,7 +10,6 @@
     <UserControl.Resources>
         <conv:SeverityToBrushConverter x:Key="SeverityBrush"/>
         <conv:SeverityToBarBrushConverter x:Key="BarBrush"/>
-        <BooleanToVisibilityConverter x:Key="BoolVis"/>
     </UserControl.Resources>
 
     <Grid Style="{StaticResource PageRoot}">
@@ -22,9 +21,12 @@
 
         <Grid Grid.Row="0" Margin="0,0,0,40">
             <StackPanel>
-                <TextBlock Text="{Binding ScenarioTitle}" Style="{StaticResource HeadingText}" Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <TextBlock Text="///" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Margin="0,0,10,0"/>
+                    <TextBlock Text="{Binding ScenarioTitle}" Style="{StaticResource HeadingText}" Margin="0"/>
+                </StackPanel>
                 <TextBlock Style="{StaticResource SubtleText}">
-                    <Run Text="{Binding Findings.Count, Mode=OneWay}"/><Run Text=" items · "/>
+                    <Run Text="{Binding Findings.Count, Mode=OneWay}"/><Run Text=" signals · "/>
                     <Run Text="{Binding WarningCount, Mode=OneWay}"/><Run Text=" warnings"/>
                 </TextBlock>
             </StackPanel>
@@ -66,35 +68,7 @@
 
                 <Border Grid.Column="2" Style="{StaticResource DashboardPanel}">
                     <StackPanel>
-                        <Border Background="#1E1E24" CornerRadius="6" Padding="20" Margin="0,0,0,20"
-                                Visibility="{Binding IsGamePerformanceScenario, Converter={StaticResource BoolVis}}">
-                            <StackPanel>
-                                <TextBlock Text="Log in-game FPS" Style="{StaticResource SectionHeader}" Margin="0,0,0,8"/>
-                                <TextBlock Text="Same game and settings each time. Compare after driver or Windows changes."
-                                           Style="{StaticResource SubtleText}" Margin="0,0,0,16"/>
-                                <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="100"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding GameName, UpdateSourceTrigger=PropertyChanged}"
-                                             Background="#111114" Foreground="#F2F2F7" BorderBrush="#2C2C2E"
-                                             Padding="10,8" FontSize="13"/>
-                                    <TextBox Grid.Column="2" Text="{Binding GameFpsInput, UpdateSourceTrigger=PropertyChanged}"
-                                             Background="#111114" Foreground="#F2F2F7" BorderBrush="#2C2C2E"
-                                             Padding="10,8" FontSize="13"/>
-                                </Grid>
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Content="Save FPS" Style="{StaticResource PrimaryButton}"
-                                            Command="{Binding SaveGameFpsCommand}" Margin="0,0,16,0"/>
-                                    <TextBlock Text="{Binding GameFpsResult}" Style="{StaticResource SubtleText}"
-                                               VerticalAlignment="Center" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock Text="Findings" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Text="Findings detail" Style="{StaticResource SectionHeader}"/>
                         <ItemsControl ItemsSource="{Binding Findings}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:Finding}">
@@ -124,7 +98,7 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,32,0,0">
             <Button Content="Back" Style="{StaticResource SecondaryButton}" Command="{Binding GoBackCommand}" Margin="0,0,16,0"/>
-            <Button Content="AI council" Style="{StaticResource PrimaryButton}" Command="{Binding GetRepairGuideCommand}"/>
+            <Button Content="Convene AI council" Style="{StaticResource PrimaryButton}" Command="{Binding GetRepairGuideCommand}"/>
         </StackPanel>
     </Grid>
 </UserControl>

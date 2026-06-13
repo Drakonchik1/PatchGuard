@@ -38,7 +38,7 @@ public sealed class OsInfoDiagnosticModule : IDiagnosticModule
             Details = $"Version {version.Major}.{version.Minor}.{version.Build}" +
                       (string.IsNullOrWhiteSpace(displayVersion) ? string.Empty : $", release {displayVersion}"),
             Severity = FindingSeverity.Info,
-            Recommendation = "Note build before updates."
+            Recommendation = "Save this build number before installing updates so you can compare after a patch."
         });
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);

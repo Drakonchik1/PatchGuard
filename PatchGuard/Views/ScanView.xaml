@@ -18,8 +18,11 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,40">
-            <TextBlock Text="{Binding ScenarioTitle}" Style="{StaticResource HeadingText}" Margin="0,0,0,12"/>
-            <TextBlock Text="Read-only scan running." Style="{StaticResource SubtleText}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="///" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Margin="0,0,10,0"/>
+                <TextBlock Text="{Binding ScenarioTitle}" Style="{StaticResource HeadingText}" Margin="0"/>
+            </StackPanel>
+            <TextBlock Text="Running diagnostics — read-only modules only." Style="{StaticResource SubtleText}"/>
         </StackPanel>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">

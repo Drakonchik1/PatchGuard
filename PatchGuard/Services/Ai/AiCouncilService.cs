@@ -47,7 +47,7 @@ public sealed class AiCouncilService : IAiCouncilService
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
-        reporter.SetPhase(CouncilPhaseType.Research, "Web search…");
+        reporter.SetPhase(CouncilPhaseType.Research, "Searching for known fixes…");
 
         var bundles = new List<(string, IReadOnlyList<WebSearchResult>)>();
         foreach (var query in BuildSearchQueries(findings))
@@ -85,11 +85,11 @@ public sealed class AiCouncilService : IAiCouncilService
         {
             reporter.SetPhase(phase, phase switch
             {
-                CouncilPhaseType.Analysis => "Analyze…",
-                CouncilPhaseType.Research => "Research…",
-                CouncilPhaseType.Debate => "Debate…",
-                CouncilPhaseType.Rebuttal => "Final pass…",
-                _ => "Working…"
+                CouncilPhaseType.Analysis => "Council analyzing scan…",
+                CouncilPhaseType.Research => "Council processing research…",
+                CouncilPhaseType.Debate => "Debate round 1…",
+                CouncilPhaseType.Rebuttal => "Debate round 2 — final positions…",
+                _ => "Council working…"
             });
 
             var round = phase is CouncilPhaseType.Debate or CouncilPhaseType.Rebuttal
@@ -138,7 +138,7 @@ public sealed class AiCouncilService : IAiCouncilService
             }
         }
 
-        reporter.SetPhase(CouncilPhaseType.Verdict, "Verdict…");
+        reporter.SetPhase(CouncilPhaseType.Verdict, "Chief Councilor deciding…");
         reporter.DeactivateAgents();
 
         var debateText = FormatTranscript(messages);

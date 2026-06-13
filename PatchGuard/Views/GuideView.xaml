@@ -27,7 +27,10 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,32">
             <StackPanel>
-                <TextBlock Text="AI Council" Style="{StaticResource HeadingText}" Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <TextBlock Text="///" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" Margin="0,0,10,0"/>
+                    <TextBlock Text="AI Council" Style="{StaticResource HeadingText}" Margin="0"/>
+                </StackPanel>
                 <TextBlock Text="{Binding Summary}" Style="{StaticResource SubtleText}" MaxWidth="640"/>
             </StackPanel>
             <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,0">
@@ -137,7 +140,7 @@
                     <Border Style="{StaticResource DashboardPanel}" BorderBrush="{StaticResource AccentBrush}" Margin="0,0,0,28">
                         <StackPanel>
                             <Grid Margin="0,0,0,20">
-                                <TextBlock Text="Verdict" Style="{StaticResource SectionHeader}" Margin="0"/>
+                                <TextBlock Text="Chief Councilor" Style="{StaticResource SectionHeader}" Margin="0"/>
                                 <Button Content="Copy verdict" Style="{StaticResource SecondaryButton}"
                                         HorizontalAlignment="Right" VerticalAlignment="Top"
                                         Command="{Binding CopyChiefVerdictCommand}"
@@ -150,7 +153,7 @@
 
                     <Border Style="{StaticResource DashboardPanel}" Margin="0,0,0,28">
                         <StackPanel>
-                            <TextBlock Text="Transcript" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Council transcript" Style="{StaticResource SectionHeader}"/>
                             <ItemsControl ItemsSource="{Binding CouncilMessages}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type models:CouncilMessage}">
@@ -179,7 +182,7 @@
 
                     <Border Style="{StaticResource DashboardPanel}">
                         <StackPanel>
-                            <TextBlock Text="Steps" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Action plan" Style="{StaticResource SectionHeader}"/>
                             <ItemsControl ItemsSource="{Binding FixSteps}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type models:FixStep}">

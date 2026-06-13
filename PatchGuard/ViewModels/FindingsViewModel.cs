@@ -5,7 +5,6 @@ using PatchGuard.Models;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
 using PatchGuard.Services.Navigation;
-using PatchGuard.Services.Performance;
 
 namespace PatchGuard.ViewModels;
 
@@ -13,16 +12,11 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
-    private readonly IGameFpsService _gameFps;
 
-    public FindingsViewModel(
-        INavigationService navigation,
-        ScanSessionState session,
-        IGameFpsService gameFps)
+    public FindingsViewModel(INavigationService navigation, ScanSessionState session)
     {
         _navigation = navigation;
         _session = session;
-        _gameFps = gameFps;
     }
 
     public ObservableCollection<Finding> Findings { get; } = [];
@@ -36,18 +30,6 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 
     [ObservableProperty]
     private int _healthScore;
-
-    [ObservableProperty]
-    private bool _isGamePerformanceScenario;
-
-    [ObservableProperty]
-    private string _gameName = string.Empty;
-
-    [ObservableProperty]
-    private string _gameFpsInput = string.Empty;
-
-    [ObservableProperty]
-    private string _gameFpsResult = string.Empty;
 
     public void OnNavigatedTo()
     {
@@ -64,34 +46,9 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
             ScanMetrics.Add(metric);
         }
 
-        ScenarioTitle = _session.SelectedScenario?.GetTitle() ?? "Results";
+        ScenarioTitle = _session.SelectedScenario?.GetTitle() ?? "Scan results";
         WarningCount = Findings.Count(f => f.Severity >= FindingSeverity.Warning);
-        HealthScore = Math.Clamp(100 - WarningCount * 12, 20, 100);
-        IsGamePerformanceScenario = _session.SelectedScenario == ScanScenario.GamePerformanceCheck;
-        GameFpsResult = string.Empty;
-    }
-
-    [RelayCommand]
-    private async Task SaveGameFpsAsync()
-    {
-        if (string.IsNullOrWhiteSpace(GameName) || !int.TryParse(GameFpsInput, out var fps) || fps <= 0)
-        {
-            GameFpsResult = "Enter game name and FPS (number).";
-            return;
-        }
-
-        var result = await _gameFps.SaveAndCompareAsync(GameName, fps);
-        GameFpsResult = result.Summary;
-
-        Findings.Add(new Finding
-        {
-            ModuleName = "Game FPS",
-            Title = $"{GameName.Trim()}: {fps} FPS",
-            Details = result.Summary,
-            Severity = result.PreviousFps is int prev && fps < prev * 0.85
-                ? FindingSeverity.Warning
-                : FindingSeverity.Info
-        });
+        HealthScore = Math.Clamp(100 - WarningCount * 12 - Findings.Count(f => f.Severity == FindingSeverity.Critical) * 20, 20, 100);
     }
 
     [RelayCommand]
