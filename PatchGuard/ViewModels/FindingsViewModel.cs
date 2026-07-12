@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using PatchGuard.Models;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
+using PatchGuard.Services.Health;
 using PatchGuard.Services.Navigation;
 
 namespace PatchGuard.ViewModels;
@@ -12,11 +13,16 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
+    private readonly IHealthScorePolicy _healthScorePolicy;
 
-    public FindingsViewModel(INavigationService navigation, ScanSessionState session)
+    public FindingsViewModel(
+        INavigationService navigation,
+        ScanSessionState session,
+        IHealthScorePolicy healthScorePolicy)
     {
         _navigation = navigation;
         _session = session;
+        _healthScorePolicy = healthScorePolicy;
     }
 
     public ObservableCollection<Finding> Findings { get; } = [];
@@ -48,7 +54,7 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 
         ScenarioTitle = _session.SelectedScenario?.GetTitle() ?? "Scan results";
         WarningCount = Findings.Count(f => f.Severity >= FindingSeverity.Warning);
-        HealthScore = Math.Clamp(100 - WarningCount * 12 - Findings.Count(f => f.Severity == FindingSeverity.Critical) * 20, 20, 100);
+        HealthScore = _healthScorePolicy.Calculate(_session.Findings);
     }
 
     [RelayCommand]
@@ -59,5 +65,5 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
     }
 
     [RelayCommand]
-    private void GoBack() => _navigation.NavigateHome();
+    private void GoBack() => _navigation.GoBack();
 }

@@ -9,5 +9,7 @@ public sealed class WebSearchResult
 
 public interface IWebSearchService
 {
+    bool IsConfigured { get; }
+
     Task<IReadOnlyList<WebSearchResult>> SearchAsync(string query, CancellationToken cancellationToken = default);
 }

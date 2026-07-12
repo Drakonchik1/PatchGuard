@@ -1,6 +1,7 @@
 <UserControl x:Class="PatchGuard.Views.FpsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PatchGuard.Controls"
              xmlns:conv="clr-namespace:PatchGuard.Converters"
              xmlns:models="clr-namespace:PatchGuard.Models"
              xmlns:entities="clr-namespace:PatchGuard.Data.Entities"
@@ -19,28 +20,19 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,28">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="///" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="16" Margin="0,0,10,0"/>
-                    <TextBlock Text="Game FPS" Style="{StaticResource HeadingText}" Margin="0"/>
-                </StackPanel>
-                <TextBlock Text="Measure real in-game frame rate (Average / 1% low / 0.1% low) with Intel PresentMon."
-                           Style="{StaticResource SubtleText}"/>
-            </StackPanel>
-        </Grid>
+        <controls:PageHeader Grid.Row="0"
+                             Title="Game Performance"
+                             Eyebrow="FRAME ANALYSIS"
+                             Subtitle="Measure real in-game frame rate (Average / 1% low / 0.1% low) with Intel PresentMon."/>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="380"/>
-                    <ColumnDefinition Width="36"/>
-                    <ColumnDefinition Width="320" MaxWidth="360"/>
-                </Grid.ColumnDefinitions>
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0,0,8,0">
+            <WrapPanel>
 
                 <!-- Left: capture controls + result -->
-                <StackPanel Grid.Column="0">
+                <StackPanel Width="420" Margin="0,0,16,0">
                     <!-- Not available notice -->
                     <Border Style="{StaticResource CardBorder}" BorderBrush="{StaticResource WarnBrush}"
                             Visibility="{Binding IsAvailable, Converter={StaticResource InverseBool}}">
@@ -63,22 +55,27 @@
                                 <ComboBox ItemsSource="{Binding Processes}"
                                           SelectedItem="{Binding SelectedProcess}"
                                           DisplayMemberPath="Display"
+                                          AutomationProperties.Name="Game or application"
                                           Height="36" VerticalContentAlignment="Center"/>
                                 <Button Grid.Column="1" Content="Refresh" Margin="12,0,0,0"
+                                        AutomationProperties.Name="Refresh running applications"
                                         Style="{StaticResource SecondaryButton}" Command="{Binding RefreshProcessesCommand}"/>
                             </Grid>
 
                             <TextBlock Text="Duration (seconds)" Style="{StaticResource MetricLabel}" Margin="0,0,0,6"/>
                             <ComboBox ItemsSource="{Binding SecondsOptions}" SelectedItem="{Binding SelectedSeconds}"
+                                      AutomationProperties.Name="Capture duration in seconds"
                                       Width="120" HorizontalAlignment="Left" Height="36" VerticalContentAlignment="Center" Margin="0,0,0,18"/>
 
                             <Button Content="Start capture" HorizontalAlignment="Left"
+                                    AutomationProperties.Name="Start frame rate capture"
                                     Style="{StaticResource PrimaryButtonInteractive}" Command="{Binding CaptureCommand}"/>
 
                             <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource SubtleText}" Margin="0,16,0,0"
                                        Visibility="{Binding IsAvailable, Converter={StaticResource BoolVis}}"/>
 
                             <Button Content="Run as admin (needed to capture other apps)" HorizontalAlignment="Left" Margin="0,16,0,0"
+                                    AutomationProperties.Name="Restart as administrator"
                                     Style="{StaticResource SecondaryButton}" Command="{Binding RunAsAdminCommand}"
                                     Visibility="{Binding IsElevated, Converter={StaticResource InverseBool}}"/>
                         </StackPanel>
@@ -113,7 +110,7 @@
                 </StackPanel>
 
                 <!-- Right: history -->
-                <Border Grid.Column="2" Style="{StaticResource DashboardPanel}" VerticalAlignment="Top">
+                <Border Width="420" Style="{StaticResource DashboardPanel}" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock Text="Recent captures" Style="{StaticResource SectionHeader}"/>
                         <ItemsControl ItemsSource="{Binding RecentCaptures}"
@@ -146,7 +143,7 @@
                         </Border>
                     </StackPanel>
                 </Border>
-            </Grid>
+            </WrapPanel>
         </ScrollViewer>
     </Grid>
 </UserControl>

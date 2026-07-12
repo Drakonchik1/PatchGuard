@@ -14,21 +14,22 @@
         TextElement.Foreground="{StaticResource TextPrimaryBrush}"
         TextElement.FontFamily="Segoe UI"
         TextOptions.TextFormattingMode="Ideal"
+        KeyboardNavigation.TabNavigation="Cycle"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <conv:StringEqualsConverter x:Key="StrEq"/>
     </Window.Resources>
 
     <DockPanel>
-        <!-- Left navigation rail -->
+        <!-- Labeled primary navigation -->
         <Border DockPanel.Dock="Left"
-                Width="216"
+                Width="224"
                 Background="{StaticResource NavBackgroundBrush}"
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- Brand -->
-                <StackPanel DockPanel.Dock="Top" Margin="24,26,24,28">
+                <StackPanel DockPanel.Dock="Top" Margin="22,24,22,22">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="PatchGuard" FontSize="19" FontWeight="Bold"
                                    Foreground="{StaticResource AccentBrush}"/>
@@ -38,44 +39,55 @@
                 </StackPanel>
 
                 <!-- Footer note -->
-                <TextBlock DockPanel.Dock="Bottom" Margin="26,0,24,22"
-                           Text="Safe boosts · No Windows settings changed"
+                <TextBlock DockPanel.Dock="Bottom" Margin="22,0,22,20"
+                           Text="Diagnostics are read-only. Optimizations show every action."
                            TextWrapping="Wrap" FontSize="11"
                            Foreground="{StaticResource TextMutedBrush}"/>
 
-                <!-- Nav items -->
-                <StackPanel>
-                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Home"
-                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Home, Mode=OneWay}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
-                            <TextBlock Text="Home" VerticalAlignment="Center"/>
-                        </StackPanel>
+                <StackPanel KeyboardNavigation.DirectionalNavigation="Contained">
+                    <TextBlock Text="WORKSPACE" Style="{StaticResource NavGroupLabel}"/>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Dashboard"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Dashboard"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Dashboard, Mode=OneWay}">
+                        <AccessText Text="_Dashboard"/>
                     </RadioButton>
-                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Monitor"
-                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Monitor, Mode=OneWay}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
-                            <TextBlock Text="Live monitor" VerticalAlignment="Center"/>
-                        </StackPanel>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Diagnose"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Diagnose"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Diagnose, Mode=OneWay}">
+                        <AccessText Text="D_iagnose"/>
                     </RadioButton>
-                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Fps"
-                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Fps, Mode=OneWay}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE7FC;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
-                            <TextBlock Text="Game FPS" VerticalAlignment="Center"/>
-                        </StackPanel>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Live Monitor"
+                                 Command="{Binding NavigateCommand}" CommandParameter="LiveMonitor"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=LiveMonitor, Mode=OneWay}">
+                        <AccessText Text="_Live Monitor"/>
                     </RadioButton>
-                    <RadioButton GroupName="nav" Style="{StaticResource NavRailButton}"
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Game Performance"
+                                 Command="{Binding NavigateCommand}" CommandParameter="GamePerformance"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=GamePerformance, Mode=OneWay}">
+                        <AccessText Text="_Game Performance"/>
+                    </RadioButton>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Optimize"
                                  Command="{Binding NavigateCommand}" CommandParameter="Optimize"
                                  IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Optimize, Mode=OneWay}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Width="26"/>
-                            <TextBlock Text="Optimize" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <AccessText Text="_Optimize"/>
+                    </RadioButton>
+                    <TextBlock Text="APPLICATION" Style="{StaticResource NavGroupLabel}" Margin="22,20,22,6"/>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Alerts"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Alerts"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Alerts, Mode=OneWay}">
+                        <AccessText Text="_Alerts"/>
+                    </RadioButton>
+                    <RadioButton GroupName="nav" Style="{StaticResource NavSidebarButton}"
+                                 AutomationProperties.Name="Settings"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Settings"
+                                 IsChecked="{Binding ActiveSection, Converter={StaticResource StrEq}, ConverterParameter=Settings, Mode=OneWay}">
+                        <AccessText Text="_Settings"/>
                     </RadioButton>
                 </StackPanel>
             </DockPanel>

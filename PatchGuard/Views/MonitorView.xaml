@@ -1,6 +1,7 @@
 <UserControl x:Class="PatchGuard.Views.MonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PatchGuard.Controls"
              xmlns:conv="clr-namespace:PatchGuard.Converters"
              xmlns:models="clr-namespace:PatchGuard.Models"
              mc:Ignorable="d"
@@ -18,16 +19,10 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,28">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="///" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="16" Margin="0,0,10,0"/>
-                    <TextBlock Text="Live monitor" Style="{StaticResource HeadingText}" Margin="0"/>
-                </StackPanel>
-                <TextBlock Text="Real-time temperatures, load, and memory. Updates every 1.5 seconds."
-                           Style="{StaticResource SubtleText}"/>
-            </StackPanel>
+        <Grid Grid.Row="0">
+            <controls:PageHeader Title="Live Monitor"
+                                 Eyebrow="LIVE HARDWARE"
+                                 Subtitle="Real-time temperatures, load, and memory. Updates every 1.5 seconds."/>
             <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                     Style="{StaticResource PillBadge}"
                     Visibility="{Binding IsElevated, Converter={StaticResource BoolVis}}">

@@ -23,32 +23,17 @@ public sealed class UpdateServicesDiagnosticModule : IDiagnosticModule
             {
                 using var controller = new ServiceController(serviceName);
                 var status = controller.Status;
-                var severity = status == ServiceControllerStatus.Running
-                    ? FindingSeverity.Info
-                    : FindingSeverity.Warning;
-
-                findings.Add(new Finding
-                {
-                    ModuleName = Name,
-                    Title = $"{serviceName}: {status}",
-                    Details = status == ServiceControllerStatus.Running
-                        ? "Service is running — good for Windows Update."
-                        : "Service is not running. Updates may fail until it is started (requires admin — start manually via services.msc).",
-                    Severity = severity,
-                    Recommendation = status != ServiceControllerStatus.Running
-                        ? "Open services.msc, find the service, and check its status. Starting it requires administrator rights."
-                        : null
-                });
+                findings.Add(UpdateServiceHealthEvaluator.CreateFinding(
+                    serviceName,
+                    status,
+                    controller.StartType));
             }
             catch (Exception ex)
             {
-                findings.Add(new Finding
-                {
-                    ModuleName = Name,
-                    Title = $"{serviceName}: unavailable",
-                    Details = ex.Message,
-                    Severity = FindingSeverity.Warning
-                });
+                findings.Add(FindingFactory.Unavailable(
+                    Name,
+                    $"{serviceName}: unavailable",
+                    $"Service status query for {serviceName} failed with {ex.GetType().Name}."));
             }
         }
 

@@ -21,7 +21,12 @@ public sealed class OsInfoDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "Non-Windows platform",
                 Details = $"PatchGuard starter pack targets Windows. Detected: {RuntimeInformation.OSDescription}",
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                Evidence = $"Runtime reported non-Windows OS: {RuntimeInformation.OSDescription}.",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.NotRequired,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
             return Task.FromResult<IReadOnlyList<Finding>>(findings);
         }
@@ -38,7 +43,13 @@ public sealed class OsInfoDiagnosticModule : IDiagnosticModule
             Details = $"Version {version.Major}.{version.Minor}.{version.Build}" +
                       (string.IsNullOrWhiteSpace(displayVersion) ? string.Empty : $", release {displayVersion}"),
             Severity = FindingSeverity.Info,
-            Recommendation = "Save this build number before installing updates so you can compare after a patch."
+            Evidence = string.IsNullOrWhiteSpace(displayVersion)
+                ? $"Environment reported Windows version {version} and build {build}; DisplayVersion was unavailable."
+                : $"Environment reported Windows version {version}, build {build}, release {displayVersion}.",
+            ActionState = FindingActionState.None,
+            AdminRequirement = FindingAdminRequirement.NotRequired,
+            Risk = FindingRisk.NotApplicable,
+            VerificationStatus = FindingVerificationStatus.NotRequired
         });
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);

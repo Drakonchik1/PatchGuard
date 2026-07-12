@@ -46,7 +46,11 @@ public sealed class GpuInfoDiagnosticModule : IDiagnosticModule
                         Title = name,
                         Details = details,
                         Severity = FindingSeverity.Info,
-                        Recommendation = "Keep GPU drivers current via NVIDIA App / AMD Adrenalin / Intel Arc Control for the best game performance and stability."
+                        Evidence = $"WMI reported adapter '{name}' with {details}.",
+                        ActionState = FindingActionState.None,
+                        AdminRequirement = FindingAdminRequirement.NotRequired,
+                        Risk = FindingRisk.NotApplicable,
+                        VerificationStatus = FindingVerificationStatus.NotRequired
                     });
                 }
             }
@@ -58,7 +62,12 @@ public sealed class GpuInfoDiagnosticModule : IDiagnosticModule
                     ModuleName = Name,
                     Title = "No display adapter detected",
                     Details = "WMI did not report any video controllers.",
-                    Severity = FindingSeverity.Info
+                    Severity = FindingSeverity.Info,
+                    Evidence = "Win32_VideoController returned zero adapters.",
+                    ActionState = FindingActionState.Unavailable,
+                    AdminRequirement = FindingAdminRequirement.NotRequired,
+                    Risk = FindingRisk.Unknown,
+                    VerificationStatus = FindingVerificationStatus.NotVerified
                 });
             }
         }
@@ -69,7 +78,12 @@ public sealed class GpuInfoDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "GPU information unavailable",
                 Details = ex.Message,
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                Evidence = $"Win32_VideoController query failed with {ex.GetType().Name}: {ex.Message}",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
         }
 

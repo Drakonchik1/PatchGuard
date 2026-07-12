@@ -8,11 +8,11 @@ namespace PatchGuard.Services.History;
 
 public sealed class PerformanceHistoryService : IPerformanceHistoryService
 {
-    private readonly PatchGuardDbContext _dbContext;
+    private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
 
-    public PerformanceHistoryService(PatchGuardDbContext dbContext)
+    public PerformanceHistoryService(IDbContextFactory<PatchGuardDbContext> dbContextFactory)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
     }
 
     public async Task SaveFpsAsync(FpsCaptureResult result, CancellationToken cancellationToken = default)
@@ -22,7 +22,9 @@ public sealed class PerformanceHistoryService : IPerformanceHistoryService
             return;
         }
 
-        _dbContext.FpsCaptures.Add(new FpsCaptureRecord
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        dbContext.FpsCaptures.Add(new FpsCaptureRecord
         {
             ProcessName = result.ProcessName,
             AverageFps = result.AverageFps,
@@ -32,12 +34,15 @@ public sealed class PerformanceHistoryService : IPerformanceHistoryService
             CapturedAt = DateTime.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<FpsCaptureRecord>> GetRecentFpsAsync(int take = 8, CancellationToken cancellationToken = default)
     {
-        var records = await _dbContext.FpsCaptures
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var records = await dbContext.FpsCaptures
+            .AsNoTracking()
             .OrderByDescending(r => r.CapturedAt)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -52,7 +57,9 @@ public sealed class PerformanceHistoryService : IPerformanceHistoryService
 
     public async Task SaveOptimizationAsync(OptimizationRunSummary summary, CancellationToken cancellationToken = default)
     {
-        _dbContext.OptimizationRuns.Add(new OptimizationRunRecord
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        dbContext.OptimizationRuns.Add(new OptimizationRunRecord
         {
             RanAt = DateTime.UtcNow,
             BytesFreed = summary.TotalBytesFreed,
@@ -60,12 +67,15 @@ public sealed class PerformanceHistoryService : IPerformanceHistoryService
             Summary = $"{summary.SucceededCount} step(s), {OptimizationStepResult.FormatBytes(summary.TotalBytesFreed)} freed"
         });
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<OptimizationRunRecord>> GetRecentOptimizationsAsync(int take = 8, CancellationToken cancellationToken = default)
     {
-        var records = await _dbContext.OptimizationRuns
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var records = await dbContext.OptimizationRuns
+            .AsNoTracking()
             .OrderByDescending(r => r.RanAt)
             .Take(take)
             .ToListAsync(cancellationToken);

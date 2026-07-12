@@ -17,21 +17,24 @@ public partial class MainViewModel : ObservableObject, IViewModelHost
     [ObservableProperty]
     private object? _currentViewModel;
 
-    /// <summary>Drives the highlighted item in the navigation rail.</summary>
+    /// <summary>Drives the highlighted item in the navigation sidebar.</summary>
     [ObservableProperty]
-    private string _activeSection = "Home";
+    private string _activeSection = "Dashboard";
 
     public string AppTitle => "PatchGuard";
 
     partial void OnCurrentViewModelChanged(object? value)
     {
-        // Keep the rail in sync when navigation happens from anywhere.
+        // Keep the sidebar in sync when navigation happens from anywhere.
         ActiveSection = value switch
         {
-            HomeViewModel => "Home",
-            MonitorViewModel => "Monitor",
-            FpsViewModel => "Fps",
+            HomeViewModel => "Dashboard",
+            DiagnoseViewModel or ScanViewModel or FindingsViewModel or GuideViewModel => "Diagnose",
+            MonitorViewModel => "LiveMonitor",
+            FpsViewModel => "GamePerformance",
             OptimizeViewModel => "Optimize",
+            AlertsViewModel => "Alerts",
+            SettingsViewModel => "Settings",
             _ => ActiveSection
         };
     }
@@ -50,17 +53,26 @@ public partial class MainViewModel : ObservableObject, IViewModelHost
 
         switch (section)
         {
-            case "Home":
+            case "Dashboard":
                 navigation.NavigateHome();
                 break;
-            case "Monitor":
+            case "Diagnose":
+                navigation.NavigateTo<DiagnoseViewModel>();
+                break;
+            case "LiveMonitor":
                 navigation.NavigateTo<MonitorViewModel>();
                 break;
-            case "Fps":
+            case "GamePerformance":
                 navigation.NavigateTo<FpsViewModel>();
                 break;
             case "Optimize":
                 navigation.NavigateTo<OptimizeViewModel>();
+                break;
+            case "Alerts":
+                navigation.NavigateTo<AlertsViewModel>();
+                break;
+            case "Settings":
+                navigation.NavigateTo<SettingsViewModel>();
                 break;
         }
     }

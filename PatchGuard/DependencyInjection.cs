@@ -7,6 +7,7 @@ using PatchGuard.Services;
 using PatchGuard.Services.Ai;
 using PatchGuard.Services.Diagnostics;
 using PatchGuard.Services.Hardware;
+using PatchGuard.Services.Health;
 using PatchGuard.Services.History;
 using PatchGuard.Services.Navigation;
 using PatchGuard.Services.Optimization;
@@ -38,7 +39,7 @@ public static class DependencyInjection
 
         services.AddSingleton(aiOptions);
 
-        services.AddDbContext<PatchGuardDbContext>(options =>
+        services.AddDbContextFactory<PatchGuardDbContext>(options =>
             options.UseSqlite($"Data Source={dbPath}"));
 
         services.AddHttpClient<OpenAiChatClient>();
@@ -74,18 +75,23 @@ public static class DependencyInjection
         services.AddSingleton<IDiagnosticModule, UpdateServicesDiagnosticModule>();
 
         services.AddSingleton<IDiagnosticOrchestrator, DiagnosticOrchestrator>();
+        services.AddSingleton<IHealthScorePolicy, HealthScorePolicy>();
+        services.AddSingleton<DatabaseSchemaInitializer>();
         services.AddSingleton<IWebSearchService, TavilyWebSearchService>();
         services.AddSingleton<IAiCouncilService, AiCouncilService>();
         services.AddSingleton<IScanHistoryService, ScanHistoryService>();
         services.AddSingleton<IPerformanceHistoryService, PerformanceHistoryService>();
 
         services.AddTransient<HomeViewModel>();
+        services.AddTransient<DiagnoseViewModel>();
         services.AddTransient<ScanViewModel>();
         services.AddTransient<FindingsViewModel>();
         services.AddTransient<GuideViewModel>();
         services.AddTransient<MonitorViewModel>();
         services.AddTransient<FpsViewModel>();
         services.AddTransient<OptimizeViewModel>();
+        services.AddTransient<AlertsViewModel>();
+        services.AddTransient<SettingsViewModel>();
 
         return services;
     }

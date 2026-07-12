@@ -57,5 +57,10 @@ public sealed class NavigationService : INavigationService
 
         (_host.CurrentViewModel as INavigationLeave)?.OnNavigatedFrom();
         _host.CurrentViewModel = _history.Pop();
+
+        if (_host.CurrentViewModel is INavigationAware aware)
+        {
+            aware.OnNavigatedTo();
+        }
     }
 }

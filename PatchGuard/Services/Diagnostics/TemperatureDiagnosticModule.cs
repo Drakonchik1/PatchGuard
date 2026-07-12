@@ -31,7 +31,12 @@ public sealed class TemperatureDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "Temperature sensors unavailable",
                 Details = snapshot.StatusMessage ?? "Hardware sensor library could not be initialised.",
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                Evidence = $"Hardware monitor unavailable: {snapshot.StatusMessage ?? "no status detail was reported"}.",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
             return Task.FromResult<IReadOnlyList<Finding>>(findings);
         }
@@ -49,7 +54,18 @@ public sealed class TemperatureDiagnosticModule : IDiagnosticModule
                     ? "Temperature sensors usually require administrator rights. Use 'Run as admin' on the Monitor screen for full readings."
                     : "No temperature sensors were exposed by this hardware.",
                 Severity = FindingSeverity.Info,
-                Recommendation = snapshot.SensorsLimited ? "Relaunch PatchGuard as administrator to read temperatures." : null
+                Evidence = snapshot.SensorsLimited
+                    ? "No CPU or GPU temperature was returned while sensor access was limited; administrator elevation may expose readings."
+                    : "The hardware monitor returned no CPU or GPU temperature and did not report limited access.",
+                Recommendation = snapshot.SensorsLimited ? "Relaunch PatchGuard as administrator to read temperatures." : null,
+                ActionState = snapshot.SensorsLimited
+                    ? FindingActionState.Recommended
+                    : FindingActionState.Unavailable,
+                AdminRequirement = snapshot.SensorsLimited
+                    ? FindingAdminRequirement.Required
+                    : FindingAdminRequirement.Unknown,
+                Risk = snapshot.SensorsLimited ? FindingRisk.Low : FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
         }
 
@@ -80,9 +96,18 @@ public sealed class TemperatureDiagnosticModule : IDiagnosticModule
                 _ => " This is within a normal range."
             },
             Severity = severity,
+            Evidence = $"{label} sensor for {deviceName} reported {temp:F0} °C.",
             Recommendation = severity >= FindingSeverity.Warning
                 ? "Improve case airflow, clean dust from fans/heatsinks, and verify the cooler is seated. Avoid blocking vents."
-                : null
+                : null,
+            ActionState = severity >= FindingSeverity.Warning
+                ? FindingActionState.Recommended
+                : FindingActionState.None,
+            AdminRequirement = FindingAdminRequirement.NotRequired,
+            Risk = severity >= FindingSeverity.Warning ? FindingRisk.Medium : FindingRisk.NotApplicable,
+            VerificationStatus = severity >= FindingSeverity.Warning
+                ? FindingVerificationStatus.NotVerified
+                : FindingVerificationStatus.NotRequired
         });
     }
 }

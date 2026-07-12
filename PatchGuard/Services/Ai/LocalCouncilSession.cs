@@ -1,10 +1,18 @@
 using System.Text;
 using PatchGuard.Models;
+using PatchGuard.Services.Health;
 
 namespace PatchGuard.Services.Ai;
 
 public sealed class LocalCouncilSession
 {
+    private readonly IHealthScorePolicy _healthScorePolicy;
+
+    public LocalCouncilSession(IHealthScorePolicy healthScorePolicy)
+    {
+        _healthScorePolicy = healthScorePolicy;
+    }
+
     public async Task<RepairGuide> RunAsync(
         ScanScenario scenario,
         IReadOnlyList<Finding> findings,
@@ -165,14 +173,18 @@ public sealed class LocalCouncilSession
         reporter.DeactivateAgents();
 
         var chiefVerdict = BuildChiefVerdict(scenario, findings, warnings, messages, webResults);
-        var steps = BuildSteps(findings, warnings);
-        var healthScore = ComputeHealthScore(findings);
+        var actionableWarnings = warnings
+            .Where(finding => finding.ActionState == FindingActionState.Recommended)
+            .ToList();
+        var steps = BuildSteps(findings, actionableWarnings);
+        var healthScore = _healthScorePolicy.Calculate(findings);
         var summary = healthScore >= 80
             ? "System health good — preventive actions recommended."
             : $"{warnings.Count} warning(s) — follow the Chief's unified plan.";
 
         reporter.EmitChief(chiefVerdict);
 
+        var references = WebReferenceMapper.FromSearchBundles(searchBundles);
         return new RepairGuide
         {
             Summary = summary,
@@ -180,12 +192,10 @@ public sealed class LocalCouncilSession
             HealthScore = healthScore,
             CouncilDiscussion = messages,
             Steps = steps,
-            WebReferences = webResults.Select(r => new WebReference
-            {
-                Title = r.Title,
-                Url = r.Url,
-                UsedFor = "Council research"
-            }).ToList()
+            Sources = references.Count == 0
+                ? [GuidanceSource.Local]
+                : [GuidanceSource.Local, GuidanceSource.WebSourced],
+            WebReferences = references
         };
     }
 
@@ -398,18 +408,6 @@ public sealed class LocalCouncilSession
         }
 
         return steps;
-    }
-
-    private static int ComputeHealthScore(IReadOnlyList<Finding> findings)
-    {
-        var penalty = findings.Sum(f => f.Severity switch
-        {
-            FindingSeverity.Critical => 25,
-            FindingSeverity.Warning => 12,
-            _ => 0
-        });
-
-        return Math.Clamp(100 - penalty, 15, 100);
     }
 
     private static string Trim(string text, int max) =>

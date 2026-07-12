@@ -9,13 +9,14 @@ using PatchGuard.Services.Navigation;
 
 namespace PatchGuard.ViewModels;
 
-public partial class ScanViewModel : ObservableObject, INavigationAware
+public partial class ScanViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
     private readonly IDiagnosticOrchestrator _orchestrator;
     private readonly IScanHistoryService _history;
     private CancellationTokenSource? _scanCts;
+    private bool _scanStarted;
 
     public ScanViewModel(
         INavigationService navigation,
@@ -42,8 +43,16 @@ public partial class ScanViewModel : ObservableObject, INavigationAware
 
     public void OnNavigatedTo()
     {
+        if (_scanStarted)
+        {
+            return;
+        }
+
+        _scanStarted = true;
         _ = RunScanAsync();
     }
+
+    public void OnNavigatedFrom() => _scanCts?.Cancel();
 
     private async Task RunScanAsync()
     {
@@ -60,7 +69,8 @@ public partial class ScanViewModel : ObservableObject, INavigationAware
         ErrorMessage = null;
         IsScanning = true;
 
-        _scanCts = new CancellationTokenSource();
+        using var scanCts = new CancellationTokenSource();
+        _scanCts = scanCts;
 
         try
         {
@@ -78,10 +88,12 @@ public partial class ScanViewModel : ObservableObject, INavigationAware
             }
 
             var progress = new Progress<DiagnosticProgressItem>(UpdateProgress);
-            var findings = await _orchestrator.RunScanAsync(scenario, progress, _scanCts.Token);
+            var findings = await _orchestrator.RunScanAsync(scenario, progress, scanCts.Token);
+            scanCts.Token.ThrowIfCancellationRequested();
 
             _session.Findings.AddRange(findings);
-            await _history.SaveScanAsync(scenario, findings, _scanCts.Token);
+            await _history.SaveScanAsync(scenario, findings, scanCts.Token);
+            scanCts.Token.ThrowIfCancellationRequested();
 
             _navigation.NavigateTo<FindingsViewModel>();
         }
@@ -96,6 +108,10 @@ public partial class ScanViewModel : ObservableObject, INavigationAware
         finally
         {
             IsScanning = false;
+            if (ReferenceEquals(_scanCts, scanCts))
+            {
+                _scanCts = null;
+            }
         }
     }
 
@@ -116,6 +132,7 @@ public partial class ScanViewModel : ObservableObject, INavigationAware
     private void CancelScan()
     {
         _scanCts?.Cancel();
+        _navigation.GoBack();
     }
 
     [RelayCommand]

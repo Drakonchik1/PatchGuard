@@ -25,7 +25,12 @@ public sealed class DiskSpaceDiagnosticModule : IDiagnosticModule
                     ModuleName = Name,
                     Title = "Drive C: is not ready",
                     Details = "Could not read disk information.",
-                    Severity = FindingSeverity.Warning
+                    Severity = FindingSeverity.Warning,
+                    Evidence = "Windows reported that system drive C: was not ready.",
+                    ActionState = FindingActionState.Unavailable,
+                    AdminRequirement = FindingAdminRequirement.Unknown,
+                    Risk = FindingRisk.Unknown,
+                    VerificationStatus = FindingVerificationStatus.NotVerified
                 });
                 return Task.FromResult<IReadOnlyList<Finding>>(findings);
             }
@@ -44,9 +49,18 @@ public sealed class DiskSpaceDiagnosticModule : IDiagnosticModule
                     ? "Windows updates and rollback files need free space. Less than 10 GB can cause failed updates."
                     : "Free space looks adequate for routine updates.",
                 Severity = severity,
+                Evidence = $"Drive C: reported {freeGb:F1} GB available out of {totalGb:F1} GB.",
                 Recommendation = severity == FindingSeverity.Warning
                     ? "Free up space via Settings → System → Storage before installing large updates."
-                    : null
+                    : null,
+                ActionState = severity == FindingSeverity.Warning
+                    ? FindingActionState.Recommended
+                    : FindingActionState.None,
+                AdminRequirement = FindingAdminRequirement.NotRequired,
+                Risk = severity == FindingSeverity.Warning ? FindingRisk.Low : FindingRisk.NotApplicable,
+                VerificationStatus = severity == FindingSeverity.Warning
+                    ? FindingVerificationStatus.NotVerified
+                    : FindingVerificationStatus.NotRequired
             });
         }
         catch (Exception ex)
@@ -56,7 +70,12 @@ public sealed class DiskSpaceDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "Disk check failed",
                 Details = ex.Message,
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                Evidence = $"Disk API failed with {ex.GetType().Name}: {ex.Message}",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
         }
 

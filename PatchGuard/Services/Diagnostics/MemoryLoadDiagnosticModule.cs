@@ -31,7 +31,12 @@ public sealed class MemoryLoadDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "Memory usage unavailable",
                 Details = "Could not read system memory information.",
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                Evidence = "Memory totals were unavailable or reported a non-positive capacity.",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
             return Task.FromResult<IReadOnlyList<Finding>>(findings);
         }
@@ -50,9 +55,18 @@ public sealed class MemoryLoadDiagnosticModule : IDiagnosticModule
                 ? " Memory is nearly full, which forces slow paging to disk and hurts performance."
                 : " Memory headroom looks healthy."),
             Severity = severity,
+            Evidence = $"Memory sensors reported {used:F1} GB used, {available:F1} GB available, and {percent:F0}% load.",
             Recommendation = severity == FindingSeverity.Warning
                 ? "Run the Optimize screen to free RAM, close unused apps/browser tabs, or add more memory."
-                : null
+                : null,
+            ActionState = severity == FindingSeverity.Warning
+                ? FindingActionState.Recommended
+                : FindingActionState.None,
+            AdminRequirement = FindingAdminRequirement.NotRequired,
+            Risk = severity == FindingSeverity.Warning ? FindingRisk.Low : FindingRisk.NotApplicable,
+            VerificationStatus = severity == FindingSeverity.Warning
+                ? FindingVerificationStatus.NotVerified
+                : FindingVerificationStatus.NotRequired
         });
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);

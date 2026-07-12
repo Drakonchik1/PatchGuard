@@ -30,7 +30,12 @@ public sealed class CpuLoadDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "CPU load unavailable",
                 Details = "Could not read CPU utilisation from sensors.",
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                Evidence = "CPU utilisation sensor returned no reading.",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
             return Task.FromResult<IReadOnlyList<Finding>>(findings);
         }
@@ -47,9 +52,20 @@ public sealed class CpuLoadDiagnosticModule : IDiagnosticModule
                           ? " Sustained high load can indicate a runaway background process."
                           : " Utilisation looks normal."),
             Severity = severity,
+            Evidence = snapshot.CpuClockMhz is { } clock
+                ? $"CPU load sensor reported {load:F0}% at {clock:F0} MHz."
+                : $"CPU load sensor reported {load:F0}%; clock speed was unavailable.",
             Recommendation = severity == FindingSeverity.Warning
                 ? "Open Task Manager → Details, sort by CPU, and close or update any unexpected high-usage process."
-                : null
+                : null,
+            ActionState = severity == FindingSeverity.Warning
+                ? FindingActionState.Recommended
+                : FindingActionState.None,
+            AdminRequirement = FindingAdminRequirement.NotRequired,
+            Risk = severity == FindingSeverity.Warning ? FindingRisk.Low : FindingRisk.NotApplicable,
+            VerificationStatus = severity == FindingSeverity.Warning
+                ? FindingVerificationStatus.NotVerified
+                : FindingVerificationStatus.NotRequired
         });
 
         return Task.FromResult<IReadOnlyList<Finding>>(findings);

@@ -1,2 +1,4 @@
 <Solution>
+  <Project Path="PatchGuard.Tests/PatchGuard.Tests.csproj" />
+  <Project Path="PatchGuard/PatchGuard.csproj" />
 </Solution>

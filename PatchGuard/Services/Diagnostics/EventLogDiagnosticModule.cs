@@ -29,7 +29,12 @@ public sealed class EventLogDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "No recent critical errors",
                 Details = $"No Error/Critical events in System or Application logs within the last {Lookback.TotalHours:F0} hours.",
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                Evidence = $"System and Application event queries returned no Level 1/2 records newer than {DateTime.UtcNow - Lookback:u}.",
+                ActionState = FindingActionState.None,
+                AdminRequirement = FindingAdminRequirement.NotRequired,
+                Risk = FindingRisk.NotApplicable,
+                VerificationStatus = FindingVerificationStatus.NotRequired
             });
         }
 
@@ -72,7 +77,13 @@ public sealed class EventLogDiagnosticModule : IDiagnosticModule
                         ModuleName = "Event Log",
                         Title = $"{logName} Event ID {id}",
                         Details = $"{provider}: {message}",
-                        Severity = record.Level <= 1 ? FindingSeverity.Critical : FindingSeverity.Warning
+                        Severity = record.Level <= 1 ? FindingSeverity.Critical : FindingSeverity.Warning,
+                        Evidence = $"{logName} log recorded Level {record.Level} Event ID {id} from {provider} at {created:u}: {message}",
+                        Recommendation = "Correlate the event time with an observed crash or failure before changing system settings; search the provider and event ID if the issue repeats.",
+                        ActionState = FindingActionState.Recommended,
+                        AdminRequirement = FindingAdminRequirement.NotRequired,
+                        Risk = FindingRisk.Low,
+                        VerificationStatus = FindingVerificationStatus.NotVerified
                     });
                 }
             }
@@ -84,7 +95,12 @@ public sealed class EventLogDiagnosticModule : IDiagnosticModule
                 ModuleName = "Event Log",
                 Title = $"{logName} log unavailable",
                 Details = ex.Message,
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                Evidence = $"{logName} event query failed with {ex.GetType().Name}: {ex.Message}",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
         }
 
