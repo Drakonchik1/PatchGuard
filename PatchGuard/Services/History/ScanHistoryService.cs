@@ -3,16 +3,21 @@ using Microsoft.EntityFrameworkCore;
 using PatchGuard.Data;
 using PatchGuard.Data.Entities;
 using PatchGuard.Models;
+using PatchGuard.Services.Health;
 
 namespace PatchGuard.Services.History;
 
 public sealed class ScanHistoryService : IScanHistoryService
 {
-    private readonly PatchGuardDbContext _dbContext;
+    private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
+    private readonly IHealthScorePolicy _healthScorePolicy;
 
-    public ScanHistoryService(PatchGuardDbContext dbContext)
+    public ScanHistoryService(
+        IDbContextFactory<PatchGuardDbContext> dbContextFactory,
+        IHealthScorePolicy healthScorePolicy)
     {
-        _dbContext = dbContext;
+        _dbContextFactory = dbContextFactory;
+        _healthScorePolicy = healthScorePolicy;
     }
 
     public async Task SaveScanAsync(
@@ -24,23 +29,30 @@ public sealed class ScanHistoryService : IScanHistoryService
         {
             Scenario = scenario.ToString(),
             ScannedAt = DateTime.UtcNow,
-            FindingsJson = JsonSerializer.Serialize(findings)
+            FindingsJson = JsonSerializer.Serialize(findings),
+            HealthScore = _healthScorePolicy.Calculate(findings),
+            ScorePolicyVersion = _healthScorePolicy.Version
         };
 
-        _dbContext.ScanRecords.Add(record);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        dbContext.ScanRecords.Add(record);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ScanHistoryEntry>> GetRecentScansAsync(
         int take = 6,
         CancellationToken cancellationToken = default)
     {
-        var records = await _dbContext.ScanRecords
+        await using var dbContext =
+            await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var records = await dbContext.ScanRecords
+            .AsNoTracking()
             .OrderByDescending(r => r.ScannedAt)
             .Take(take)
             .ToListAsync(cancellationToken);
 
-        var entries = records.Select(MapEntry).ToList();
+        var entries = records.Select(record => MapEntry(record, _healthScorePolicy)).ToList();
 
         for (var i = 0; i < entries.Count - 1; i++)
         {
@@ -53,11 +65,11 @@ public sealed class ScanHistoryService : IScanHistoryService
         return entries;
     }
 
-    private static ScanHistoryEntry MapEntry(ScanRecord record)
+    private static ScanHistoryEntry MapEntry(ScanRecord record, IHealthScorePolicy healthScorePolicy)
     {
         var findings = JsonSerializer.Deserialize<List<Finding>>(record.FindingsJson) ?? [];
         var warnings = findings.Count(f => f.Severity >= FindingSeverity.Warning);
-        var health = ComputeHealthScore(findings);
+        var health = record.HealthScore ?? healthScorePolicy.Calculate(findings);
 
         Enum.TryParse<ScanScenario>(record.Scenario, out var scenario);
 
@@ -84,11 +96,4 @@ public sealed class ScanHistoryService : IScanHistoryService
         };
     }
 
-    private static int ComputeHealthScore(IReadOnlyList<Finding> findings) =>
-        Math.Clamp(100 - findings.Sum(f => f.Severity switch
-        {
-            FindingSeverity.Critical => 25,
-            FindingSeverity.Warning => 12,
-            _ => 0
-        }), 15, 100);
 }

@@ -12,6 +12,9 @@
             <DataTemplate DataType="{x:Type vm:HomeViewModel}">
                 <views:HomeView/>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:DiagnoseViewModel}">
+                <views:DiagnoseView/>
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vm:ScanViewModel}">
                 <views:ScanView/>
             </DataTemplate>
@@ -29,6 +32,12 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:OptimizeViewModel}">
                 <views:OptimizeView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:AlertsViewModel}">
+                <views:PlannedFeatureView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+                <views:PlannedFeatureView/>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

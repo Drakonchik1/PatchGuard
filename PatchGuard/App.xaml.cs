@@ -24,12 +24,11 @@ public partial class App : Application
         services.AddPatchGuard(configuration);
         _serviceProvider = services.BuildServiceProvider();
 
-        using (var scope = _serviceProvider.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<PatchGuardDbContext>();
-            db.Database.EnsureCreated();
-            db.EnsureUpgradeSchema();
-        }
+        _serviceProvider
+            .GetRequiredService<DatabaseSchemaInitializer>()
+            .InitializeAsync()
+            .GetAwaiter()
+            .GetResult();
 
         var mainWindow = new MainWindow();
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();

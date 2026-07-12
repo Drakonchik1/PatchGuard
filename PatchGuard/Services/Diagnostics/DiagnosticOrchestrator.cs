@@ -65,6 +65,10 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
                     ? "No issues reported."
                     : $"{findings.Count} item(s) recorded.";
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 item.Status = DiagnosticProgressStatus.Failed;

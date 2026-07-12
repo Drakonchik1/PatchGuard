@@ -8,5 +8,6 @@ public interface IAiCouncilService
         ScanScenario scenario,
         IReadOnlyList<Finding> findings,
         IProgress<CouncilProgressUpdate>? progress = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool allowExternalServices = false);
 }

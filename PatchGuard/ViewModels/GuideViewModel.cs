@@ -9,11 +9,12 @@ using PatchGuard.Services.Navigation;
 
 namespace PatchGuard.ViewModels;
 
-public partial class GuideViewModel : ObservableObject, INavigationAware
+public partial class GuideViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
     private readonly IAiCouncilService _aiCouncil;
+    private CancellationTokenSource? _councilCts;
 
     public GuideViewModel(
         INavigationService navigation,
@@ -44,7 +45,9 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
     public ObservableCollection<CouncilPhaseStep> PhaseSteps { get; }
     public ObservableCollection<CouncilMessage> CouncilMessages { get; } = [];
     public ObservableCollection<FixStep> FixSteps { get; } = [];
+    public ObservableCollection<WebReference> WebReferences { get; } = [];
     public ObservableCollection<ScanMetric> ScanMetrics { get; } = [];
+    public ObservableCollection<string> SourceLabels { get; } = [];
 
     [ObservableProperty]
     private string _summary = string.Empty;
@@ -59,13 +62,38 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
     private bool _isCouncilRunning;
 
     [ObservableProperty]
+    private bool _hasExternalAiConsent;
+
+    [ObservableProperty]
     private int _healthScore;
 
     [ObservableProperty]
     private string? _errorMessage;
 
-    public void OnNavigatedTo() => _ = RunCouncilAsync();
+    public void OnNavigatedTo()
+    {
+        ResetUi();
+        LoadScanMetrics();
 
+        if (_session.Guide is not null)
+        {
+            ApplyGuide(_session.Guide);
+            MarkAllPhasesComplete();
+            return;
+        }
+
+        Summary = "Optional guidance is ready when you choose to generate it.";
+        SourceLabels.Add("Local diagnostic data");
+    }
+
+    public void OnNavigatedFrom()
+    {
+        _councilCts?.Cancel();
+        IsCouncilRunning = false;
+        RunCouncilCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunCouncil))]
     private async Task RunCouncilAsync()
     {
         ResetUi();
@@ -78,6 +106,10 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
 
         LoadScanMetrics();
         IsCouncilRunning = true;
+        RunCouncilCommand.NotifyCanExecuteChanged();
+        _councilCts?.Cancel();
+        using var councilCts = new CancellationTokenSource();
+        _councilCts = councilCts;
 
         try
         {
@@ -86,11 +118,18 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
             var guide = await _aiCouncil.BuildGuideAsync(
                 scenario,
                 _session.Findings,
-                progress);
+                progress,
+                councilCts.Token,
+                HasExternalAiConsent);
+            councilCts.Token.ThrowIfCancellationRequested();
 
             _session.Guide = guide;
             ApplyGuide(guide);
             MarkAllPhasesComplete();
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "AI guidance cancelled. No system changes were made.";
         }
         catch (Exception ex)
         {
@@ -99,19 +138,30 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
         finally
         {
             IsCouncilRunning = false;
+            HasExternalAiConsent = false;
+            RunCouncilCommand.NotifyCanExecuteChanged();
             CouncilStatus = string.Empty;
             foreach (var panel in AgentPanels)
             {
                 panel.IsActive = false;
             }
+
+            if (ReferenceEquals(_councilCts, councilCts))
+            {
+                _councilCts = null;
+            }
         }
     }
+
+    private bool CanRunCouncil() => !IsCouncilRunning;
 
     private void ResetUi()
     {
         CouncilMessages.Clear();
         FixSteps.Clear();
+        WebReferences.Clear();
         ScanMetrics.Clear();
+        SourceLabels.Clear();
         ChiefVerdict = string.Empty;
         Summary = string.Empty;
         HealthScore = 0;
@@ -218,6 +268,17 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
         Summary = guide.Summary;
         ChiefVerdict = guide.ChiefVerdict;
         HealthScore = guide.HealthScore;
+        SourceLabels.Clear();
+        foreach (var source in guide.Sources.Distinct())
+        {
+            SourceLabels.Add(source switch
+            {
+                GuidanceSource.Local => "Local diagnostic data",
+                GuidanceSource.AiGenerated => "AI-generated advice",
+                GuidanceSource.WebSourced => "Web-sourced research",
+                _ => "Source unavailable"
+            });
+        }
 
         CouncilMessages.Clear();
         foreach (var message in guide.CouncilDiscussion)
@@ -230,6 +291,12 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
         {
             FixSteps.Add(step);
         }
+
+        WebReferences.Clear();
+        foreach (var reference in guide.WebReferences)
+        {
+            WebReferences.Add(reference);
+        }
     }
 
     [RelayCommand]
@@ -240,18 +307,15 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
             return;
         }
 
-        // The URL comes from AI/web output, so only open well-formed http(s)
-        // links — never arbitrary schemes (file:, javascript:, custom handlers).
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!LaunchUriPolicy.TryNormalize(url, out var launchUri) || launchUri is null)
         {
-            ErrorMessage = "Blocked a link that was not a standard http/https web address.";
+            ErrorMessage = "Blocked a link that was not a safe web or Windows Settings address.";
             return;
         }
 
         try
         {
-            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(launchUri) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
@@ -275,6 +339,16 @@ public partial class GuideViewModel : ObservableObject, INavigationAware
         {
             System.Windows.Clipboard.SetText(ChiefVerdict);
         }
+    }
+
+    [RelayCommand]
+    private void CancelCouncil() => _councilCts?.Cancel();
+
+    [RelayCommand]
+    private void GoBack()
+    {
+        _councilCts?.Cancel();
+        _navigation.GoBack();
     }
 
     [RelayCommand]

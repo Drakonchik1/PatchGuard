@@ -8,11 +8,20 @@ public sealed class RepairGuide
     public IReadOnlyList<CouncilMessage> CouncilDiscussion { get; init; } = [];
     public IReadOnlyList<FixStep> Steps { get; init; } = [];
     public IReadOnlyList<WebReference> WebReferences { get; init; } = [];
+    public IReadOnlyList<GuidanceSource> Sources { get; init; } = [GuidanceSource.Local];
+}
+
+public enum GuidanceSource
+{
+    Local,
+    AiGenerated,
+    WebSourced
 }
 
 public sealed class WebReference
 {
     public required string Title { get; init; }
     public required string Url { get; init; }
+    public required string Domain { get; init; }
     public required string UsedFor { get; init; }
 }

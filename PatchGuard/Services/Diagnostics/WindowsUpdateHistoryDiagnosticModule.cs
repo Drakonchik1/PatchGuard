@@ -37,7 +37,12 @@ public sealed class WindowsUpdateHistoryDiagnosticModule : IDiagnosticModule
                     ModuleName = Name,
                     Title = "No update history found",
                     Details = "WMI returned no hotfix records.",
-                    Severity = FindingSeverity.Info
+                    Severity = FindingSeverity.Info,
+                    Evidence = "Win32_QuickFixEngineering returned zero hotfix records.",
+                    ActionState = FindingActionState.Unavailable,
+                    AdminRequirement = FindingAdminRequirement.NotRequired,
+                    Risk = FindingRisk.Unknown,
+                    VerificationStatus = FindingVerificationStatus.NotVerified
                 });
             }
             else
@@ -50,7 +55,11 @@ public sealed class WindowsUpdateHistoryDiagnosticModule : IDiagnosticModule
                     Details = string.Join(Environment.NewLine, updates.Select(u =>
                         $"{u.Id} ({u.InstalledOn:yyyy-MM-dd}) — {u.Description}")),
                     Severity = FindingSeverity.Info,
-                    Recommendation = "If problems started after a specific KB, note its ID before searching for known issues."
+                    Evidence = $"WMI reported {updates.Count} recent hotfix record(s); newest was {latest.Id} installed {latest.InstalledOn:yyyy-MM-dd}.",
+                    ActionState = FindingActionState.None,
+                    AdminRequirement = FindingAdminRequirement.NotRequired,
+                    Risk = FindingRisk.NotApplicable,
+                    VerificationStatus = FindingVerificationStatus.NotRequired
                 });
             }
         }
@@ -61,7 +70,12 @@ public sealed class WindowsUpdateHistoryDiagnosticModule : IDiagnosticModule
                 ModuleName = Name,
                 Title = "Update history check failed",
                 Details = ex.Message,
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                Evidence = $"Win32_QuickFixEngineering query failed with {ex.GetType().Name}: {ex.Message}",
+                ActionState = FindingActionState.Unavailable,
+                AdminRequirement = FindingAdminRequirement.Unknown,
+                Risk = FindingRisk.Unknown,
+                VerificationStatus = FindingVerificationStatus.NotVerified
             });
         }
 

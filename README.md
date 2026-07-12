@@ -2,69 +2,86 @@
 
 Windows desktop health, performance, and boost tool (WPF + .NET 10). Live hardware
 monitoring, real game FPS capture, a one-click safe optimizer, read-only diagnostics,
-and a multi-agent AI council that explains how to fix what it finds.
+and optional multi-agent AI guidance with explicit privacy controls.
 
 ## Run
 
 ```powershell
-cd PatchGuard\PatchGuard
-dotnet run
+dotnet run --project PatchGuard/PatchGuard.csproj
 ```
 
+## Test
+
+```powershell
+dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj
+```
+
+133 automated tests cover navigation, scoring, history, AI privacy, diagnostics, and UI contracts.
+
+## Navigation
+
+Labeled sidebar: **Dashboard**, **Diagnose**, **Live Monitor**, **Game Performance**,
+**Optimize**, **Alerts**, **Settings**.
+
+Diagnostic journey: **Choose scan** → **Scan** → **Review findings** → **Optional AI guidance**
+(with persistent step indicator and predictable back/cancel).
+
+See [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) for the full phased roadmap and [HANDOFF.md](HANDOFF.md) for developer handoff.
+
 ## Features
+
+### Dashboard
+Overall health from latest scan, recommended next action, recent scan history with
+trends, live hardware snapshot, quick links to Monitor / FPS / Optimize.
 
 ### Live monitor
 Real-time CPU/GPU temperatures, load, clocks, fan/power sensors, and memory usage
 via [LibreHardwareMonitorLib](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor).
-Load and RAM work without admin; full temperature/fan sensors require administrator
-rights, so the Monitor screen offers a one-click "Run as admin" relaunch.
+Load and RAM work without admin; full sensors require elevation ("Run as admin").
 
 ### Game FPS
-Measures real in-game **Average / 1% low / 0.1% low** frame rate using Intel
-[PresentMon](https://github.com/GameTechDev/PresentMon) (MIT). PresentMon is not
-redistributed in source control — drop `PresentMon-x64.exe` into
-`PatchGuard/Tools/PresentMon/` (see that folder's `README.txt`). Capturing another
-process usually needs administrator rights.
+Average / 1% low / 0.1% low via Intel [PresentMon](https://github.com/GameTechDev/PresentMon) (MIT).
+Drop `PresentMon-x64.exe` into `PatchGuard/Tools/PresentMon/` (see `README.txt` there).
+Capturing another process usually needs administrator rights. Binaries are Authenticode-verified before launch.
 
-### Optimize (one-click safe boost)
-Runs only safe, reversible actions and **changes no Windows settings**:
+### Optimize (safe boost)
+Reversible actions only — no Windows settings changes:
 
-- Free RAM by trimming process working sets
-- Clear temporary files (user/Windows temp + INet cache; in-use files are skipped)
-- Empty the Recycle Bin
-- Flush the DNS resolver cache
-- Optional: restart Windows Explorer
+- Trim working sets
+- Clear temp files (contained paths; skips reparse points)
+- Empty Recycle Bin
+- Flush DNS cache
+- Optional: restart Explorer
 
-### Diagnostics + AI council
-Pick a scenario, run a read-only scan, then convene the AI council for a fix plan.
-
-| Module | Status |
-|--------|--------|
-| OS build info | Live |
-| Disk space (C:) | Live |
-| Memory (RAM) | Live |
-| Temperatures (CPU/GPU) | Live |
-| CPU load | Live |
-| Graphics card (model/driver/VRAM) | Live |
-| Windows Update history (KB list) | Live |
-| Event Log (48h errors) | Live |
-| Update services (read-only) | Live |
+### Diagnostics
+Read-only modules: OS, disk, memory, temperatures, CPU, GPU, Windows Update history,
+event log (48h), update services.
 
 Scenarios: **Full system audit**, **Game performance check**, **After Windows Update**,
 **Quick health check**.
 
-## AI council
+### Health score
+Single deterministic policy (`risk-capped-v1`): per-module caps prevent event-log noise
+from collapsing the score. Snapshots persist with each scan for stable history trends.
 
-1. **Technician** — proposes fixes from scan data
-2. **Skeptic** — challenges risky or unproven advice
-3. **Researcher** — adds web search context (Tavily when configured)
-4. **Chief Councilor** — reads the full debate and writes one unified verdict + manual steps
+### Findings
+Each result includes explanation, evidence, recommended fix, action state, admin
+requirement, risk, and verification status.
 
-Without API keys, a **local council** runs the same debate flow with rule-based responses.
+### AI guidance (optional)
+Four-agent council flow (Technician, Skeptic, Researcher, Chief) when API keys are configured.
+
+**Privacy by default:** external AI/web calls require an explicit consent checkbox per request.
+Only sanitized diagnostic **categories** are sent — never titles, event text, paths, or secrets.
+Guide UI shows source labels (local / AI / web) and inspectable reference links (safe http/https only).
+
+Fix-step links open http(s) web pages or whitelisted `ms-settings:` pages only.
+
+Without API keys, a **local council** runs the same flow with rule-based responses.
 
 ### API keys (optional)
 
-Copy `appsettings.example.json` → `appsettings.Development.json`:
+Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Development.json` (gitignored):
 
 ```json
 {
@@ -82,15 +99,24 @@ Copy `appsettings.example.json` → `appsettings.Development.json`:
 ## Stack
 
 .NET 10 WPF · MVVM (CommunityToolkit.Mvvm) · EF Core SQLite · LibreHardwareMonitorLib ·
-Intel PresentMon · OpenAI HTTP · Tavily search
+Intel PresentMon · OpenAI HTTP · Tavily search · xUnit
 
-## Safety & permissions
+## Safety
 
-- The optimizer only performs safe, reversible actions and never edits Windows settings.
-- Diagnostics are read-only.
-- PatchGuard runs as the normal user by default and only self-elevates (with a UAC
-  prompt) when you choose "Run as admin" for full hardware sensors or to capture FPS
-  for another process.
-- Hardware monitoring loads a kernel driver via LibreHardwareMonitor; some antivirus
-  tools may flag this. The app remains fully usable (load, RAM, boosts, scans) without
-  elevation if you prefer not to grant it.
+- Optimizer: safe, reversible actions only.
+- Diagnostics: read-only.
+- Default: normal user; UAC only when you choose elevation.
+- PresentMon: Intel-signed binary required in Tools folder.
+- External links and AI payloads validated before use.
+
+## Roadmap status
+
+| Phase | Status |
+|-------|--------|
+| 1 — UX foundation | Done |
+| 2 — Diagnostic journey | Done |
+| 3 — Alerts + guided fixes | Planned |
+| 4 — Optimization expansion | Planned |
+| 5 — Settings, history, FPS UX | Planned |
+
+Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md)
