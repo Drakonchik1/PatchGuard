@@ -7,10 +7,12 @@
              mc:Ignorable="d"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             d:DesignHeight="600" d:DesignWidth="1000">
+             d:DesignHeight="720" d:DesignWidth="1000">
     <UserControl.Resources>
         <conv:SeverityToBrushConverter x:Key="SeverityBrush"/>
         <conv:SeverityToBarBrushConverter x:Key="BarBrush"/>
+        <conv:HealthScoreBrushConverter x:Key="HealthScoreBrush"/>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
     </UserControl.Resources>
 
     <Grid Style="{StaticResource PageRoot}">
@@ -24,102 +26,217 @@
         <controls:PageHeader Grid.Row="0"
                              Title="{Binding ScenarioTitle}"
                              Eyebrow="SCAN RESULTS"
-                             Subtitle="Review measured system signals before generating a repair guide."/>
+                             Subtitle="Review measured signals, then open optional AI guidance if you want help prioritizing fixes."/>
 
         <controls:JourneyStepIndicator Grid.Row="1" CurrentStep="3"/>
 
         <ScrollViewer Grid.Row="2"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
-                      Padding="0,0,8,0">
-            <WrapPanel>
-                <controls:StatusSummaryCard Width="420"
-                                            Caption="HEALTH INDEX"
-                                            Value="{Binding HealthScore, StringFormat='{}{0} / 100'}"
-                                            SupportingText="{Binding WarningCount, StringFormat='Warnings requiring review: {0}'}"
-                                            StatusBrush="{StaticResource AccentBrush}"
-                                            AutomationProperties.Name="Scan health summary"/>
+                      Padding="0,0,4,0">
+            <StackPanel>
+                <!-- Summary row: full width two-column -->
+                <Grid Margin="0,0,0,28">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="24"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <Border Width="420" Style="{StaticResource DashboardPanel}" VerticalAlignment="Top" Margin="0,0,16,28">
-                    <StackPanel>
-                        <TextBlock Text="System usage" Style="{StaticResource SectionHeader}"/>
-                        <ItemsControl ItemsSource="{Binding ScanMetrics}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type models:ScanMetric}">
-                                    <StackPanel Margin="0,0,0,22">
-                                        <Grid>
-                                            <TextBlock Text="{Binding Label}" Style="{StaticResource MetricLabel}"/>
-                                            <TextBlock Text="{Binding Value}" Style="{StaticResource MetricValue}"/>
-                                        </Grid>
-                                        <ProgressBar Style="{StaticResource AccentProgressBar}"
-                                                     Maximum="100" Value="{Binding BarPercent}"
-                                                     Foreground="{Binding Severity, Converter={StaticResource BarBrush}}"/>
+                    <!-- Health hero -->
+                    <Border Grid.Column="0"
+                            Style="{StaticResource DashboardPanel}"
+                            Margin="0"
+                            AutomationProperties.Name="Scan health summary">
+                        <StackPanel>
+                            <TextBlock Text="HEALTH SCORE" Style="{StaticResource StatCaption}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,10">
+                                <TextBlock Text="{Binding HealthScore}"
+                                           FontSize="56"
+                                           FontWeight="Bold"
+                                           LineHeight="56"
+                                           Foreground="{Binding HealthScore, Converter={StaticResource HealthScoreBrush}}"/>
+                                <TextBlock Text="/ 100"
+                                           FontSize="22"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Bottom"
+                                           Margin="10,0,0,8"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding HealthStatusLabel}"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Text="{Binding HealthStatusDetail}"
+                                       Style="{StaticResource SubtleText}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Scan overview -->
+                    <Border Grid.Column="2"
+                            Style="{StaticResource DashboardPanel}"
+                            Margin="0"
+                            AutomationProperties.Name="Scan overview">
+                        <StackPanel>
+                            <TextBlock Text="Scan overview" Style="{StaticResource SectionHeader}" Margin="0,0,0,16"/>
+
+                            <UniformGrid Columns="3" Margin="0,0,0,20">
+                                <Border Style="{StaticResource InsetStatTile}" Margin="0,0,10,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Findings" Style="{StaticResource StatCaption}"/>
+                                        <TextBlock Text="{Binding TotalFindings}"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   Margin="0,6,0,0"/>
                                     </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
+                                </Border>
+                                <Border Style="{StaticResource InsetStatTile}" Margin="0,0,10,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Warnings" Style="{StaticResource StatCaption}"/>
+                                        <TextBlock Text="{Binding WarningCount}"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource WarnBrush}"
+                                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource InsetStatTile}">
+                                    <StackPanel>
+                                        <TextBlock Text="Critical" Style="{StaticResource StatCaption}"/>
+                                        <TextBlock Text="{Binding CriticalCount}"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource CriticalBrush}"
+                                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
 
-                <Border Width="420" Style="{StaticResource DashboardPanel}">
-                    <StackPanel>
-                        <TextBlock Text="Findings detail" Style="{StaticResource SectionHeader}"/>
-                        <ItemsControl ItemsSource="{Binding Findings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type models:Finding}">
-                                    <Border Background="#1E1E24" CornerRadius="6" Padding="20" Margin="0,0,0,16">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,12">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <Ellipse Width="8" Height="8" Margin="0,6,12,0" VerticalAlignment="Top"
-                                                             Fill="{Binding Severity, Converter={StaticResource SeverityBrush}}"/>
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"
-                                                               Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                                                </StackPanel>
-                                                <TextBlock Text="{Binding ModuleName}" HorizontalAlignment="Right"
-                                                           Style="{StaticResource MetricLabel}" Margin="12,0,0,0"/>
+                            <TextBlock Text="System snapshot"
+                                       Style="{StaticResource StatCaption}"
+                                       Margin="0,0,0,12"
+                                       Visibility="{Binding HasSystemMetrics, Converter={StaticResource BoolVis}}"/>
+                            <ItemsControl ItemsSource="{Binding ScanMetrics}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:ScanMetric}">
+                                        <StackPanel Margin="0,0,0,14">
+                                            <Grid>
+                                                <TextBlock Text="{Binding Label}" Style="{StaticResource MetricLabel}"/>
+                                                <TextBlock Text="{Binding Value}"
+                                                           Style="{StaticResource MetricValue}"
+                                                           TextWrapping="Wrap"/>
                                             </Grid>
-                                            <TextBlock Text="{Binding Severity, StringFormat='Severity: {0}'}"
-                                                       Style="{StaticResource MetricLabel}" Margin="0,0,0,10"/>
-                                            <TextBlock Text="Explanation" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap"
-                                                       Style="{StaticResource SubtleText}" FontSize="13" LineHeight="20"
-                                                       Margin="0,4,0,12"/>
-                                            <TextBlock Text="Evidence" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock Text="{Binding Evidence}" TextWrapping="Wrap"
-                                                       Style="{StaticResource SubtleText}" Margin="0,4,0,12"/>
-                                            <TextBlock Text="Recommended fix" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
-                                            <TextBlock Text="{Binding RecommendedFix}" TextWrapping="Wrap"
-                                                       Style="{StaticResource SubtleText}" Margin="0,4,0,12"/>
+                                            <ProgressBar Style="{StaticResource AccentProgressBar}"
+                                                         Maximum="100"
+                                                         Value="{Binding BarPercent}"
+                                                         Foreground="{Binding Severity, Converter={StaticResource BarBrush}}"
+                                                         Visibility="{Binding ShowProgressBar, Converter={StaticResource BoolVis}}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Findings list -->
+                <TextBlock Text="Findings"
+                           Style="{StaticResource SectionHeader}"
+                           Margin="0,0,0,12"/>
+                <ItemsControl ItemsSource="{Binding Findings}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:Finding}">
+                            <Border Style="{StaticResource CardBorder}"
+                                    BorderThickness="4,0,0,0"
+                                    BorderBrush="{Binding Severity, Converter={StaticResource SeverityBrush}}"
+                                    AutomationProperties.Name="{Binding Title}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                                        <StackPanel Margin="0,0,120,0">
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="15"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding ModuleName}"
+                                                       Style="{StaticResource MetricLabel}"
+                                                       Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                        <Border HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Background="{StaticResource InsetBackgroundBrush}"
+                                                CornerRadius="4"
+                                                Padding="10,4">
+                                            <TextBlock Text="{Binding Severity}"
+                                                       FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{Binding Severity, Converter={StaticResource SeverityBrush}}"/>
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="1" Margin="0,0,0,14">
+                                        <TextBlock Text="Explanation"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="13"
+                                                   Margin="0,0,0,4"/>
+                                        <TextBlock Text="{Binding Explanation}"
+                                                   Style="{StaticResource SubtleText}"
+                                                   FontSize="13"
+                                                   LineHeight="20"/>
+                                    </StackPanel>
+
+                                    <Expander Grid.Row="2"
+                                              Header="Evidence and recommended action"
+                                              Foreground="{StaticResource TextMutedBrush}"
+                                              IsExpanded="False">
+                                        <StackPanel Margin="0,10,0,0">
+                                            <TextBlock Text="Evidence" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="{Binding Evidence}"
+                                                       Style="{StaticResource SubtleText}"
+                                                       FontSize="13"
+                                                       Margin="0,4,0,14"/>
+                                            <TextBlock Text="Recommended fix" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Text="{Binding RecommendedFix}"
+                                                       Style="{StaticResource SubtleText}"
+                                                       FontSize="13"
+                                                       Margin="0,4,0,14"/>
                                             <WrapPanel>
                                                 <TextBlock Text="{Binding ActionState, StringFormat='Action state: {0}'}"
-                                                           Style="{StaticResource MetricLabel}" Margin="0,0,18,6"/>
+                                                           Style="{StaticResource MetricLabel}"
+                                                           Margin="0,0,18,6"/>
                                                 <TextBlock Text="{Binding AdminRequirement, StringFormat='Admin requirement: {0}'}"
-                                                           Style="{StaticResource MetricLabel}" Margin="0,0,18,6"/>
+                                                           Style="{StaticResource MetricLabel}"
+                                                           Margin="0,0,18,6"/>
                                                 <TextBlock Text="{Binding Risk, StringFormat='Risk: {0}'}"
-                                                           Style="{StaticResource MetricLabel}" Margin="0,0,18,6"/>
+                                                           Style="{StaticResource MetricLabel}"
+                                                           Margin="0,0,18,6"/>
                                                 <TextBlock Text="{Binding VerificationStatus, StringFormat='Verification status: {0}'}"
-                                                           Style="{StaticResource MetricLabel}" Margin="0,0,18,6"/>
+                                                           Style="{StaticResource MetricLabel}"
+                                                           Margin="0,0,18,6"/>
                                             </WrapPanel>
-                                            <TextBlock Text="Source: Local diagnostic data"
-                                                       Style="{StaticResource MetricLabel}" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-            </WrapPanel>
+                                    </Expander>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,32,0,0">
-            <Button Content="Choose another scan" Style="{StaticResource SecondaryButton}" Command="{Binding GoBackCommand}" Margin="0,0,16,0"
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+            <Button Content="Choose another scan"
+                    Style="{StaticResource SecondaryButton}"
+                    Command="{Binding GoBackCommand}"
+                    Margin="0,0,16,0"
                     AutomationProperties.Name="Return to scan choices"/>
-            <Button Content="Open optional AI guidance" Style="{StaticResource PrimaryButtonInteractive}" Command="{Binding GetRepairGuideCommand}"
+            <Button Content="Open optional AI guidance"
+                    Style="{StaticResource PrimaryButtonInteractive}"
+                    Command="{Binding GetRepairGuideCommand}"
                     AutomationProperties.Name="Open optional AI guidance without generating it"/>
         </StackPanel>
     </Grid>

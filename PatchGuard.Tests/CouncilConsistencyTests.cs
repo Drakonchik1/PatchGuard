@@ -100,7 +100,11 @@ public sealed class CouncilConsistencyTests
         var openAi = new OpenAiChatClient(
             new HttpClient(new StubOpenAiHandler()),
             options);
-        return new AiCouncilService(openAi, new StubWebSearch(webResults), policy);
+        return new AiCouncilService(
+            openAi,
+            new StubWebSearch(webResults),
+            policy,
+            new NoOpCouncilEvaluationService());
     }
 
     private static Finding CreateFinding(FindingSeverity severity) =>
@@ -143,5 +147,20 @@ public sealed class CouncilConsistencyTests
             };
             return Task.FromResult(response);
         }
+    }
+
+    private sealed class NoOpCouncilEvaluationService : ICouncilEvaluationService
+    {
+        public Task SaveAsync(
+            ScanScenario scenario,
+            RepairGuide guide,
+            TimeSpan latency,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>> GetRecentAsync(
+            int take = 10,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>>([]);
     }
 }

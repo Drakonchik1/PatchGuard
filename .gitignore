@@ -1,6 +1,7 @@
 bin/
 obj/
 .vs/
+.worktrees/
 *.user
 appsettings.Development.json
 PatchGuard/appsettings.Development.json

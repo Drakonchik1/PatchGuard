@@ -77,7 +77,9 @@ public static class DependencyInjection
         services.AddSingleton<IDiagnosticOrchestrator, DiagnosticOrchestrator>();
         services.AddSingleton<IHealthScorePolicy, HealthScorePolicy>();
         services.AddSingleton<DatabaseSchemaInitializer>();
+        services.AddSingleton<CouncilEvaluator>();
         services.AddSingleton<IWebSearchService, TavilyWebSearchService>();
+        services.AddSingleton<ICouncilEvaluationService, CouncilEvaluationService>();
         services.AddSingleton<IAiCouncilService, AiCouncilService>();
         services.AddSingleton<IScanHistoryService, ScanHistoryService>();
         services.AddSingleton<IPerformanceHistoryService, PerformanceHistoryService>();

@@ -29,4 +29,10 @@
     <ProjectReference Include="..\PatchGuard\PatchGuard.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\GoldenScenarios\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

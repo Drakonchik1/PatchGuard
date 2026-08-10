@@ -10,6 +10,7 @@ namespace PatchGuard.Data;
 public sealed class DatabaseSchemaInitializer
 {
     private const string SnapshotMigration = "20260712_HealthScoreSnapshots";
+    private const string CouncilEvaluationMigration = "20260810_CouncilEvaluationRecords";
     private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
     private readonly IHealthScorePolicy _healthScorePolicy;
 
@@ -61,6 +62,19 @@ public sealed class DatabaseSchemaInitializer
             );
             CREATE INDEX IF NOT EXISTS "IX_OptimizationRuns_RanAt" ON "OptimizationRuns" ("RanAt");
 
+            CREATE TABLE IF NOT EXISTS "CouncilEvaluations" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_CouncilEvaluations" PRIMARY KEY AUTOINCREMENT,
+                "EvaluatedAt" TEXT NOT NULL,
+                "Scenario" TEXT NOT NULL,
+                "Source" TEXT NOT NULL,
+                "LatencyMs" INTEGER NOT NULL DEFAULT 0,
+                "FixStepCount" INTEGER NOT NULL DEFAULT 0,
+                "CouncilMessageCount" INTEGER NOT NULL DEFAULT 0,
+                "ActionabilityScore" REAL NULL,
+                "ConsistencyScore" REAL NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_CouncilEvaluations_EvaluatedAt" ON "CouncilEvaluations" ("EvaluatedAt");
+
             CREATE TABLE IF NOT EXISTS "SchemaMigrations" (
                 "MigrationId" TEXT NOT NULL CONSTRAINT "PK_SchemaMigrations" PRIMARY KEY,
                 "AppliedAt" TEXT NOT NULL
@@ -98,6 +112,12 @@ public sealed class DatabaseSchemaInitializer
             $"""
              INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
              VALUES ({SnapshotMigration}, {DateTime.UtcNow});
+             """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
+             VALUES ({CouncilEvaluationMigration}, {DateTime.UtcNow});
              """,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);

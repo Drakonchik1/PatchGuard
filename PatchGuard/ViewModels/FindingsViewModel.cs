@@ -37,6 +37,46 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
     [ObservableProperty]
     private int _healthScore;
 
+    [ObservableProperty]
+    private int _criticalCount;
+
+    [ObservableProperty]
+    private int _totalFindings;
+
+    public string HealthStatusLabel => HealthScore switch
+    {
+        >= 85 => "Healthy",
+        >= 70 => "Fair",
+        >= 50 => "Needs attention",
+        _ => "Critical issues detected"
+    };
+
+    public string HealthStatusDetail
+    {
+        get
+        {
+            if (WarningCount == 0 && CriticalCount == 0)
+            {
+                return "No warnings or critical issues in this scan.";
+            }
+
+            var parts = new List<string>();
+            if (WarningCount > 0)
+            {
+                parts.Add($"{WarningCount} warning{(WarningCount == 1 ? string.Empty : "s")}");
+            }
+
+            if (CriticalCount > 0)
+            {
+                parts.Add($"{CriticalCount} critical");
+            }
+
+            return $"{string.Join(" and ", parts)} to review below.";
+        }
+    }
+
+    public bool HasSystemMetrics => ScanMetrics.Count > 0;
+
     public void OnNavigatedTo()
     {
         Findings.Clear();
@@ -53,9 +93,24 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
         }
 
         ScenarioTitle = _session.SelectedScenario?.GetTitle() ?? "Scan results";
+        TotalFindings = Findings.Count;
         WarningCount = Findings.Count(f => f.Severity >= FindingSeverity.Warning);
+        CriticalCount = Findings.Count(f => f.Severity == FindingSeverity.Critical);
         HealthScore = _healthScorePolicy.Calculate(_session.Findings);
+        OnPropertyChanged(nameof(HealthStatusLabel));
+        OnPropertyChanged(nameof(HealthStatusDetail));
+        OnPropertyChanged(nameof(HasSystemMetrics));
     }
+
+    partial void OnHealthScoreChanged(int value)
+    {
+        OnPropertyChanged(nameof(HealthStatusLabel));
+        OnPropertyChanged(nameof(HealthStatusDetail));
+    }
+
+    partial void OnWarningCountChanged(int value) => OnPropertyChanged(nameof(HealthStatusDetail));
+
+    partial void OnCriticalCountChanged(int value) => OnPropertyChanged(nameof(HealthStatusDetail));
 
     [RelayCommand]
     private void GetRepairGuide()

@@ -68,7 +68,8 @@ public sealed class AiPrivacyAndProvenanceTests
         var service = new AiCouncilService(
             new OpenAiChatClient(new HttpClient(handler), new AiOptions()),
             search,
-            new HealthScorePolicy());
+            new HealthScorePolicy(),
+            new NoOpCouncilEvaluationService());
 
         await service.BuildGuideAsync(
             ScanScenario.QuickHealthCheck,
@@ -113,6 +114,26 @@ public sealed class AiPrivacyAndProvenanceTests
         Assert.Contains(GuidanceSource.WebSourced, guide.Sources);
     }
 
+    [Fact]
+    public async Task CouncilSessionIsPersistedAsAggregateEvaluation()
+    {
+        var evaluation = new RecordingEvaluationService();
+        var service = CreateService(
+            new CapturingOpenAiHandler(),
+            new CapturingWebSearch([]),
+            evaluation);
+
+        await service.BuildGuideAsync(
+            ScanScenario.QuickHealthCheck,
+            [SensitiveFinding()],
+            allowExternalServices: false);
+
+        var saved = Assert.Single(evaluation.Saves);
+        Assert.Equal(ScanScenario.QuickHealthCheck, saved.Scenario);
+        Assert.True(saved.Latency >= TimeSpan.Zero);
+        Assert.NotNull(saved.Guide);
+    }
+
     [Theory]
     [InlineData("https://example.com/path", true)]
     [InlineData("http://example.com/path", true)]
@@ -125,13 +146,15 @@ public sealed class AiPrivacyAndProvenanceTests
 
     private static AiCouncilService CreateService(
         CapturingOpenAiHandler handler,
-        CapturingWebSearch search)
+        CapturingWebSearch search,
+        ICouncilEvaluationService? evaluationService = null)
     {
         var options = new AiOptions { ApiKey = "configured", Model = "test-model" };
         return new AiCouncilService(
             new OpenAiChatClient(new HttpClient(handler), options),
             search,
-            new HealthScorePolicy());
+            new HealthScorePolicy(),
+            evaluationService ?? new NoOpCouncilEvaluationService());
     }
 
     private static Finding SensitiveFinding(string moduleName = "Event logs") =>
@@ -185,5 +208,40 @@ public sealed class AiPrivacyAndProvenanceTests
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
         }
+    }
+
+    private sealed class NoOpCouncilEvaluationService : ICouncilEvaluationService
+    {
+        public Task SaveAsync(
+            ScanScenario scenario,
+            RepairGuide guide,
+            TimeSpan latency,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>> GetRecentAsync(
+            int take = 10,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>>([]);
+    }
+
+    private sealed class RecordingEvaluationService : ICouncilEvaluationService
+    {
+        public List<(ScanScenario Scenario, RepairGuide Guide, TimeSpan Latency)> Saves { get; } = [];
+
+        public Task SaveAsync(
+            ScanScenario scenario,
+            RepairGuide guide,
+            TimeSpan latency,
+            CancellationToken cancellationToken = default)
+        {
+            Saves.Add((scenario, guide, latency));
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>> GetRecentAsync(
+            int take = 10,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PatchGuard.Data.Entities.CouncilEvaluationRecord>>([]);
     }
 }

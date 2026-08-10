@@ -6,30 +6,7 @@ public static class ScanMetricBuilder
 {
     public static IReadOnlyList<ScanMetric> FromFindings(IReadOnlyList<Finding> findings)
     {
-        var metrics = new List<ScanMetric>
-        {
-            new()
-            {
-                Label = "Findings",
-                Value = findings.Count.ToString(),
-                BarPercent = Math.Min(100, findings.Count * 8),
-                Severity = FindingSeverity.Info
-            },
-            new()
-            {
-                Label = "Warnings",
-                Value = findings.Count(f => f.Severity == FindingSeverity.Warning).ToString(),
-                BarPercent = Math.Min(100, findings.Count(f => f.Severity == FindingSeverity.Warning) * 25),
-                Severity = FindingSeverity.Warning
-            },
-            new()
-            {
-                Label = "Critical",
-                Value = findings.Count(f => f.Severity == FindingSeverity.Critical).ToString(),
-                BarPercent = Math.Min(100, findings.Count(f => f.Severity == FindingSeverity.Critical) * 40),
-                Severity = FindingSeverity.Critical
-            }
-        };
+        var metrics = new List<ScanMetric>();
 
         var os = findings.FirstOrDefault(f => f.ModuleName == "Operating system");
         if (os is not null)
@@ -37,9 +14,10 @@ public static class ScanMetricBuilder
             metrics.Add(new ScanMetric
             {
                 Label = "OS build",
-                Value = Trim(os.Title, 28),
+                Value = Trim(os.Title, 48),
                 BarPercent = 100,
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                ShowProgressBar = false
             });
         }
 
@@ -49,9 +27,10 @@ public static class ScanMetricBuilder
             metrics.Add(new ScanMetric
             {
                 Label = "Storage",
-                Value = Trim(disk.Title.Replace("C: has ", string.Empty), 24),
+                Value = Trim(disk.Title.Replace("C: has ", string.Empty), 48),
                 BarPercent = disk.Severity >= FindingSeverity.Warning ? 35 : 85,
-                Severity = disk.Severity
+                Severity = disk.Severity,
+                ShowProgressBar = true
             });
         }
 
@@ -61,9 +40,10 @@ public static class ScanMetricBuilder
             metrics.Add(new ScanMetric
             {
                 Label = "Memory",
-                Value = Trim(memory.Title.Replace("RAM ", string.Empty), 24),
+                Value = Trim(memory.Title.Replace("RAM ", string.Empty), 48),
                 BarPercent = memory.Severity >= FindingSeverity.Warning ? 92 : 55,
-                Severity = memory.Severity
+                Severity = memory.Severity,
+                ShowProgressBar = true
             });
         }
 
@@ -73,9 +53,10 @@ public static class ScanMetricBuilder
             {
                 Label = temp.Title.StartsWith("GPU") ? "GPU temp" : "CPU temp",
                 Value = Trim(temp.Title.Replace(" temperature", string.Empty)
-                    .Replace("CPU ", string.Empty).Replace("GPU ", string.Empty), 12),
+                    .Replace("CPU ", string.Empty).Replace("GPU ", string.Empty), 24),
                 BarPercent = temp.Severity == FindingSeverity.Critical ? 95 : temp.Severity == FindingSeverity.Warning ? 80 : 45,
-                Severity = temp.Severity
+                Severity = temp.Severity,
+                ShowProgressBar = true
             });
         }
 
@@ -85,9 +66,10 @@ public static class ScanMetricBuilder
             metrics.Add(new ScanMetric
             {
                 Label = "GPU",
-                Value = Trim(gpu.Title, 26),
+                Value = Trim(gpu.Title, 48),
                 BarPercent = 100,
-                Severity = FindingSeverity.Info
+                Severity = FindingSeverity.Info,
+                ShowProgressBar = false
             });
         }
 
@@ -96,10 +78,11 @@ public static class ScanMetricBuilder
         {
             metrics.Add(new ScanMetric
             {
-                Label = "Update svc",
+                Label = "Update services",
                 Value = $"{services.Count} issue(s)",
                 BarPercent = 40,
-                Severity = FindingSeverity.Warning
+                Severity = FindingSeverity.Warning,
+                ShowProgressBar = false
             });
         }
 

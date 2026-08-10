@@ -37,7 +37,7 @@
                 <views:PlannedFeatureView/>
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
-                <views:PlannedFeatureView/>
+                <views:SettingsView/>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

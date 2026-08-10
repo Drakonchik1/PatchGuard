@@ -1,0 +1,42 @@
+{
+  "name": "web-only-provenance-drift",
+  "scenario": "AfterWindowsUpdate",
+  "expectedActionabilityScore": 83.3,
+  "expectedConsistencyScore": 83.3,
+  "guide": {
+    "summary": "The guidance is still useful, but the source label drifted away from the expected local-plus-web baseline.",
+    "chiefVerdict": "Use the vendor article for sequencing, then bring the result back into a local baseline scan.",
+    "sources": [ "WebSourced" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Researcher",
+        "content": "The vendor article is relevant, but the source metadata lost the local baseline tag.",
+        "headline": "Source drift",
+        "phase": "Research",
+        "round": 1,
+        "confidence": 72
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Open vendor article",
+        "instructions": "Read the vendor support article and confirm the listed service-recovery sequence matches the current Windows build.",
+        "linkUrl": "https://support.example.com/windows-update-recovery"
+      },
+      {
+        "order": 2,
+        "title": "Run a follow-up scan",
+        "instructions": "Run a follow-up quick health check after the repair so you have a fresh local comparison point."
+      }
+    ],
+    "webReferences": [
+      {
+        "title": "Windows Update recovery",
+        "url": "https://support.example.com/windows-update-recovery",
+        "domain": "support.example.com",
+        "usedFor": "Post-update recovery sequence"
+      }
+    ]
+  }
+}

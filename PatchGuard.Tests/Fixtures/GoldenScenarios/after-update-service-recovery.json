@@ -1,0 +1,36 @@
+{
+  "name": "after-update-service-recovery",
+  "scenario": "AfterWindowsUpdate",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council isolated the issue to stalled update services after a cumulative patch.",
+    "chiefVerdict": "Restart the update stack first, then rescan before changing anything else.",
+    "sources": [ "Local" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Technician",
+        "content": "The measured evidence points to the service layer rather than disk pressure.",
+        "headline": "Service-side fault",
+        "phase": "Analysis",
+        "round": 1,
+        "confidence": 74
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Open Services",
+        "instructions": "Open Services, restart Windows Update and Background Intelligent Transfer Service, then confirm both return to Running state.",
+        "copyText": "services.msc"
+      },
+      {
+        "order": 2,
+        "title": "Rescan after restart",
+        "instructions": "Run the quick health check again immediately after the restart so the next council pass can compare against the same baseline.",
+        "copyText": "Run Quick health check"
+      }
+    ],
+    "webReferences": []
+  }
+}

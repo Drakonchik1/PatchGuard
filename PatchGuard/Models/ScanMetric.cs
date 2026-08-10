@@ -6,4 +6,5 @@ public sealed class ScanMetric
     public required string Value { get; init; }
     public int BarPercent { get; init; }
     public FindingSeverity Severity { get; init; } = FindingSeverity.Info;
+    public bool ShowProgressBar { get; init; }
 }

@@ -1,0 +1,29 @@
+{
+  "name": "manual-verification-only",
+  "scenario": "QuickHealthCheck",
+  "expectedActionabilityScore": 66.7,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council found mild instability but preferred a manual verification pass before any corrective action.",
+    "chiefVerdict": "Inspect the warnings and compare them to your last healthy scan before applying fixes.",
+    "sources": [ "Local" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Skeptic",
+        "content": "The current evidence is real but not severe enough to justify a blind repair.",
+        "headline": "Verify first",
+        "phase": "Debate",
+        "round": 1,
+        "confidence": 70
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Review event warnings",
+        "instructions": "Open Event Viewer and compare the latest warnings with the most recent healthy scan so you can confirm whether this is new or recurring noise."
+      }
+    ],
+    "webReferences": []
+  }
+}

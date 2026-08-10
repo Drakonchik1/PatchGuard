@@ -1,0 +1,36 @@
+{
+  "name": "duplicate-step-regression",
+  "scenario": "FullSystemAudit",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 83.3,
+  "guide": {
+    "summary": "Council produced two valid fixes, but the wording drifted into a duplicated title.",
+    "chiefVerdict": "The repair order is still usable, but the repeated title signals a formatting regression.",
+    "sources": [ "Local", "AiGenerated" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Chief Councilor",
+        "content": "The steps are useful, yet the repeated title makes the output less precise than the baseline.",
+        "headline": "Formatting drift",
+        "phase": "Verdict",
+        "round": 1,
+        "confidence": 81
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Restart service",
+        "instructions": "Restart the Windows Update service and verify it reports Running before continuing with the next step.",
+        "copyText": "services.msc"
+      },
+      {
+        "order": 2,
+        "title": "Restart service",
+        "instructions": "Restart Background Intelligent Transfer Service and verify it reports Running before you rescan the device.",
+        "copyText": "services.msc"
+      }
+    ],
+    "webReferences": []
+  }
+}

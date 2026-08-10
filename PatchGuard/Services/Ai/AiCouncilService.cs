@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using PatchGuard.Models;
@@ -15,16 +16,19 @@ public sealed class AiCouncilService : IAiCouncilService
     private readonly OpenAiChatClient _openAi;
     private readonly IWebSearchService _webSearch;
     private readonly IHealthScorePolicy _healthScorePolicy;
+    private readonly ICouncilEvaluationService _evaluationService;
     private readonly LocalCouncilSession _localSession;
 
     public AiCouncilService(
         OpenAiChatClient openAi,
         IWebSearchService webSearch,
-        IHealthScorePolicy healthScorePolicy)
+        IHealthScorePolicy healthScorePolicy,
+        ICouncilEvaluationService evaluationService)
     {
         _openAi = openAi;
         _webSearch = webSearch;
         _healthScorePolicy = healthScorePolicy;
+        _evaluationService = evaluationService;
         _localSession = new LocalCouncilSession(healthScorePolicy);
     }
 
@@ -35,25 +39,45 @@ public sealed class AiCouncilService : IAiCouncilService
         CancellationToken cancellationToken = default,
         bool allowExternalServices = false)
     {
+        var stopwatch = Stopwatch.StartNew();
         var reporter = new CouncilProgressReporter(progress);
+        RepairGuide guide;
         if (!allowExternalServices || (!_openAi.IsConfigured && !_webSearch.IsConfigured))
         {
-            return await _localSession.RunAsync(
+            guide = await _localSession.RunAsync(
                 scenario, findings, [], [], reporter, cancellationToken);
         }
-
-        var context = ExternalDiagnosticSanitizer.BuildContext(scenario, findings);
-        var searchBundles = await RunSearchesAsync(findings, reporter, cancellationToken);
-        var allWeb = searchBundles.SelectMany(b => b.Results).DistinctBy(r => r.Url).ToList();
-
-        if (!_openAi.IsConfigured)
+        else
         {
-            return await _localSession.RunAsync(
-                scenario, findings, allWeb, searchBundles, reporter, cancellationToken);
+            var context = ExternalDiagnosticSanitizer.BuildContext(scenario, findings);
+            var searchBundles = await RunSearchesAsync(findings, reporter, cancellationToken);
+            var allWeb = searchBundles.SelectMany(b => b.Results).DistinctBy(r => r.Url).ToList();
+
+            guide = !_openAi.IsConfigured
+                ? await _localSession.RunAsync(
+                    scenario, findings, allWeb, searchBundles, reporter, cancellationToken)
+                : await RunOpenAiCouncilAsync(
+                    scenario, findings, context, allWeb, searchBundles, reporter, cancellationToken);
         }
 
-        return await RunOpenAiCouncilAsync(
-            scenario, findings, context, allWeb, searchBundles, reporter, cancellationToken);
+        await SaveEvaluationAsync(scenario, guide, stopwatch.Elapsed, cancellationToken);
+        return guide;
+    }
+
+    private async Task SaveEvaluationAsync(
+        ScanScenario scenario,
+        RepairGuide guide,
+        TimeSpan latency,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _evaluationService.SaveAsync(scenario, guide, latency, cancellationToken);
+        }
+        catch
+        {
+            // Evaluation persistence is best-effort and must not block guidance.
+        }
     }
 
     private async Task<List<(string Query, IReadOnlyList<WebSearchResult> Results)>> RunSearchesAsync(
