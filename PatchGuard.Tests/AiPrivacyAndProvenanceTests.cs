@@ -24,7 +24,9 @@ public sealed class AiPrivacyAndProvenanceTests
 
         Assert.Empty(search.Queries);
         Assert.Empty(handler.Payloads);
-        Assert.Equal([GuidanceSource.Local], guide.Sources);
+        Assert.Contains(GuidanceSource.Local, guide.Sources);
+        Assert.DoesNotContain(GuidanceSource.AiGenerated, guide.Sources);
+        Assert.DoesNotContain(GuidanceSource.WebSourced, guide.Sources);
     }
 
     [Fact]
@@ -68,6 +70,7 @@ public sealed class AiPrivacyAndProvenanceTests
         var service = new AiCouncilService(
             new OpenAiChatClient(new HttpClient(handler), new AiOptions()),
             search,
+            new EmptyKnowledgeRetrievalService(),
             new HealthScorePolicy(),
             new NoOpCouncilEvaluationService());
 
@@ -153,8 +156,27 @@ public sealed class AiPrivacyAndProvenanceTests
         return new AiCouncilService(
             new OpenAiChatClient(new HttpClient(handler), options),
             search,
+            new EmptyKnowledgeRetrievalService(),
             new HealthScorePolicy(),
             evaluationService ?? new NoOpCouncilEvaluationService());
+    }
+
+    private sealed class EmptyKnowledgeRetrievalService : IKnowledgeRetrievalService
+    {
+        public Task EnsureIndexedAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<KnowledgeHit>> RetrieveAsync(
+            string query,
+            int topK = 3,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeHit>>([]);
+
+        public Task<IReadOnlyList<KnowledgeHit>> RetrieveForFindingsAsync(
+            IReadOnlyList<Finding> findings,
+            int topKPerQuery = 3,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeHit>>([]);
     }
 
     private static Finding SensitiveFinding(string moduleName = "Event logs") =>

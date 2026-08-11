@@ -18,6 +18,7 @@ public sealed class LocalCouncilSession
         IReadOnlyList<Finding> findings,
         IReadOnlyList<WebSearchResult> webResults,
         IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> searchBundles,
+        IReadOnlyList<KnowledgeHit> knowledgeHits,
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
@@ -37,7 +38,7 @@ public sealed class LocalCouncilSession
             {
                 CouncilAgents.Technician => BuildTechnicianAnalysis(focusFindings, findings),
                 CouncilAgents.Skeptic => BuildSkepticAnalysis(focusFindings, findings),
-                CouncilAgents.Researcher => BuildResearcherAnalysis(focusFindings, searchBundles),
+                CouncilAgents.Researcher => BuildResearcherAnalysis(focusFindings, searchBundles, knowledgeHits),
                 _ => string.Empty
             };
 
@@ -45,7 +46,9 @@ public sealed class LocalCouncilSession
             {
                 CouncilAgents.Technician => warnings.Count == 0 ? "System baseline OK" : $"{warnings.Count} issue(s) to address",
                 CouncilAgents.Skeptic => warnings.Count == 0 ? "No false alarms" : "Validate before acting",
-                _ => searchBundles.Sum(b => b.Results.Count) > 0 ? "Web data mapped" : "Playbook mode"
+                _ => knowledgeHits.Count > 0 || searchBundles.Sum(b => b.Results.Count) > 0
+                    ? "Evidence mapped"
+                    : "Playbook mode"
             };
 
             messages.Add(reporter.EmitMessage(new CouncilMessage
@@ -71,9 +74,9 @@ public sealed class LocalCouncilSession
 
             var content = agent switch
             {
-                CouncilAgents.Researcher => BuildResearchSynthesis(focusFindings, webResults, searchBundles),
-                CouncilAgents.Technician => BuildTechnicianResearchReaction(focusFindings, webResults),
-                CouncilAgents.Skeptic => BuildSkepticResearchReaction(webResults),
+                CouncilAgents.Researcher => BuildResearchSynthesis(focusFindings, webResults, searchBundles, knowledgeHits),
+                CouncilAgents.Technician => BuildTechnicianResearchReaction(focusFindings, webResults, knowledgeHits),
+                CouncilAgents.Skeptic => BuildSkepticResearchReaction(webResults, knowledgeHits),
                 _ => string.Empty
             };
 
@@ -125,7 +128,7 @@ public sealed class LocalCouncilSession
             Round = 1,
             Headline = "Sides with evidence",
             Confidence = 73,
-            Content = BuildDebateResearchPosition(focusFindings, webResults)
+            Content = BuildDebateResearchPosition(focusFindings, webResults, knowledgeHits)
         }));
         await Task.Delay(250, cancellationToken);
 
@@ -185,6 +188,7 @@ public sealed class LocalCouncilSession
         reporter.EmitChief(chiefVerdict);
 
         var references = WebReferenceMapper.FromSearchBundles(searchBundles);
+        var kbReferences = KnowledgeRetrievalService.ToReferences(knowledgeHits);
         return new RepairGuide
         {
             Summary = summary,
@@ -192,10 +196,12 @@ public sealed class LocalCouncilSession
             HealthScore = healthScore,
             CouncilDiscussion = messages,
             Steps = steps,
-            Sources = references.Count == 0
-                ? [GuidanceSource.Local]
-                : [GuidanceSource.Local, GuidanceSource.WebSourced],
-            WebReferences = references
+            WebReferences = references,
+            KnowledgeReferences = kbReferences,
+            Sources = GuidanceSourceBuilder.Build(
+                hasAi: false,
+                hasWeb: references.Count > 0,
+                hasKnowledgeBase: kbReferences.Count > 0)
         };
     }
 
@@ -235,10 +241,24 @@ public sealed class LocalCouncilSession
 
     private static string BuildResearcherAnalysis(
         List<Finding> focus,
-        IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> bundles)
+        IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> bundles,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
         var sb = new StringBuilder();
-        sb.Append($"Mapped {bundles.Sum(b => b.Results.Count)} web hits to findings. ");
+        sb.Append(
+            $"Mapped {bundles.Sum(b => b.Results.Count)} web hits and {knowledgeHits.Count} local KB excerpts. ");
+
+        if (knowledgeHits.Count > 0)
+        {
+            sb.AppendLine();
+            sb.Append("Local KB: ");
+            sb.Append(string.Join(
+                "; ",
+                knowledgeHits.Take(3).Select(hit =>
+                    $"{hit.Chunk.Title} ({hit.Chunk.PlaybookId}, score={hit.Score:F2})")));
+            sb.Append('.');
+        }
+
         foreach (var f in focus)
         {
             var bundle = bundles.FirstOrDefault(b =>
@@ -260,14 +280,33 @@ public sealed class LocalCouncilSession
     private static string BuildResearchSynthesis(
         List<Finding> focus,
         IReadOnlyList<WebSearchResult> allWeb,
-        IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> bundles)
+        IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> bundles,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
-        if (allWeb.Count == 0)
+        var sb = new StringBuilder();
+        if (knowledgeHits.Count > 0)
         {
-            return "Operating from internal Windows playbooks — no live search API. Patterns still apply: disk space, stopped update services, and noisy DCOM entries after patches.";
+            sb.Append("Local playbooks ranked for this scan: ");
+            foreach (var hit in knowledgeHits.Take(3))
+            {
+                sb.AppendLine();
+                sb.Append(
+                    $"• KB/{hit.Chunk.PlaybookId} — {hit.Chunk.Title}: {Trim(hit.Chunk.Content, 140)}");
+            }
+
+            sb.AppendLine();
         }
 
-        var sb = new StringBuilder("Research summary across queries: ");
+        if (allWeb.Count == 0)
+        {
+            sb.Append(
+                knowledgeHits.Count > 0
+                    ? "No live web API — grounding steps in the KB excerpts above plus scan-native rules."
+                    : "Operating from internal Windows playbooks — no live search API. Patterns still apply: disk space, stopped update services, and noisy DCOM entries after patches.");
+            return sb.ToString().Trim();
+        }
+
+        sb.Append("Research summary across queries: ");
         foreach (var (query, results) in bundles.Where(b => b.Results.Count > 0))
         {
             sb.AppendLine();
@@ -279,29 +318,50 @@ public sealed class LocalCouncilSession
         return sb.ToString().Trim();
     }
 
-    private static string BuildTechnicianResearchReaction(List<Finding> focus, IReadOnlyList<WebSearchResult> web)
+    private static string BuildTechnicianResearchReaction(
+        List<Finding> focus,
+        IReadOnlyList<WebSearchResult> web,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
-        if (web.Count == 0)
+        if (web.Count == 0 && knowledgeHits.Count == 0)
         {
-            return "Without web hits I'm still confident in playbook fixes — especially freeing disk and documenting the latest KB before more patching.";
+            return "Without web or KB hits I'm still confident in playbook fixes — especially freeing disk and documenting the latest KB before more patching.";
         }
 
-        return $"Web data reinforces my order: tackle \"{focus.First().Title}\" first, then re-run PatchGuard to confirm the warning cleared.";
+        var source = knowledgeHits.Count > 0 ? "KB playbooks" : "web data";
+        return $"{source} reinforce my order: tackle \"{focus.First().Title}\" first, then re-run PatchGuard to confirm the warning cleared.";
     }
 
-    private static string BuildSkepticResearchReaction(IReadOnlyList<WebSearchResult> web)
+    private static string BuildSkepticResearchReaction(
+        IReadOnlyList<WebSearchResult> web,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
-        return web.Count == 0
-            ? "No external sources — double down on scan-native evidence only. Reject any step not tied to a finding we actually saw."
+        if (web.Count == 0 && knowledgeHits.Count == 0)
+        {
+            return "No external sources — double down on scan-native evidence only. Reject any step not tied to a finding we actually saw.";
+        }
+
+        return knowledgeHits.Count > 0
+            ? "Local KB is safer than random forums, but I still reject any step that needs elevation or third-party cleaners."
             : "External threads often suggest dangerous scripts — I accept only Storage Sense, uninstalls, and Settings-based actions.";
     }
 
-    private static string BuildDebateResearchPosition(List<Finding> focus, IReadOnlyList<WebSearchResult> web)
+    private static string BuildDebateResearchPosition(
+        List<Finding> focus,
+        IReadOnlyList<WebSearchResult> web,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
         var top = focus.FirstOrDefault();
         if (top is null)
         {
             return "No contested findings — research adds nothing beyond baseline documentation.";
+        }
+
+        if (knowledgeHits.Count > 0)
+        {
+            var hit = knowledgeHits[0];
+            return
+                $"Weighting local KB + scan: \"{top.Title}\" aligns with playbook \"{hit.Chunk.Title}\" ({hit.Chunk.PlaybookId}). {Trim(hit.Chunk.Content, 160)}";
         }
 
         return $"Weighting community data + scan: \"{top.Title}\" is the anchor issue. {LocalKnowledgeBase.GetResearcherOpinion(top, web, top.Title)}";
@@ -336,7 +396,7 @@ public sealed class LocalCouncilSession
         }
         else
         {
-            sb.AppendLine($"We confirmed {warnings.Count} warning-level item(s). The Technician prioritised concrete fixes; the Skeptic blocked elevated or destructive actions; the Researcher aligned patterns from {(webResults.Count > 0 ? "web threads" : "internal playbooks")}.");
+            sb.AppendLine($"We confirmed {warnings.Count} warning-level item(s). The Technician prioritised concrete fixes; the Skeptic blocked elevated or destructive actions; the Researcher aligned patterns from {(webResults.Count > 0 ? "web threads and local KB" : "local knowledge-base playbooks")}.");
             sb.AppendLine();
             sb.AppendLine("Unified plan:");
             var step = 1;

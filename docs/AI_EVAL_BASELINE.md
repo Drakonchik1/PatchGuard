@@ -41,6 +41,24 @@ guide text. It is safe for local trend analysis and Settings UI history.
 These are not “truth” metrics. They are fast baseline metrics that help catch regressions
 in output shape before deeper qualitative review.
 
+## RAG groundedness (Phase 1)
+
+Local playbooks live in `PatchGuard/KnowledgeBase/Playbooks`. Retrieval ranks chunks with
+local hashing embeddings only (never uploads playbook text to OpenAI during indexing —
+privacy + stable vector dimensions) and attaches `GuidanceSource.KnowledgeBase` plus
+inspectable `KnowledgeReferences`. `OpenAiEmbeddingService` remains available for future
+opt-in cloud features but is not used by the KB index.
+
+KB retrieval runs even without external AI consent — it never leaves the machine.
+
+Manual check after a local council on “After Windows Update” / Update services warning:
+
+- Source labels include **Local knowledge base**
+- Inspectable references list playbook ids (e.g. `windows-update-services`)
+- Researcher messages mention `KB/` excerpts
+
+Automated coverage: `KnowledgeRetrievalTests` (chunking, ranking, council provenance).
+
 ## Golden baseline
 
 The baseline is defined by 5 curated golden fixtures in

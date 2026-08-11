@@ -35,7 +35,8 @@ public static class CouncilAgents
             """,
         Researcher =>
             $"""
-            You are the Researcher. Synthesize web snippets into YOUR opinion — do not paste URLs as the answer.
+            You are the Researcher. Synthesize local knowledge-base excerpts and web snippets into YOUR opinion —
+            do not paste URLs as the answer. Prefer grounded KB playbooks when they match the scan categories.
             {NoLazyLinksRule}
             Explain what the pattern means for this exact PC. Under 130 words. Line 1 = headline.
             """,
@@ -69,9 +70,9 @@ public static class CouncilAgents
         },
         CouncilPhaseType.Research => role switch
         {
-            Researcher => "PHASE: Research. Synthesize the web results into actionable insight.",
-            Technician => "PHASE: Research. Does web data change your fix order?",
-            Skeptic => "PHASE: Research. Which online advice should we reject as unsafe?",
+            Researcher => "PHASE: Research. Synthesize local KB excerpts and web results into actionable insight.",
+            Technician => "PHASE: Research. Does KB/web data change your fix order?",
+            Skeptic => "PHASE: Research. Which online or KB advice should we reject as unsafe?",
             _ => "Review research."
         },
         CouncilPhaseType.Debate => "PHASE: Debate round 1. Respond to other agents. Disagree when warranted.",

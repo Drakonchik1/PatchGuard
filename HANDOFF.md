@@ -6,8 +6,9 @@
 
 - Phase 1 UX shell: sidebar, design system, dashboard, reusable controls.
 - Phase 2 diagnostic journey: step indicator, unified scoring, actionable findings, optional AI with consent + provenance.
-- `PatchGuard.Tests`: 133 automated tests.
+- `PatchGuard.Tests`: 145 automated tests.
 - Security hardening: launch URI policy, EF factory, sanitizer allowlist, navigation fixes.
+- Phase 1 RAG: local playbook KB, retrieval, KnowledgeBase provenance (offline embeddings).
 
 ## Run
 

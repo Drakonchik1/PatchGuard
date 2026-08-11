@@ -70,10 +70,10 @@ public sealed class CouncilEvaluationService : ICouncilEvaluationService
 
         return (hasAi, hasWeb) switch
         {
-            (true, true) => "AI+Web",
-            (true, false) => "AI",
-            (false, true) => "Web",
-            _ => "Local"
+            (true, true) => sources.Contains(GuidanceSource.KnowledgeBase) ? "AI+Web+KB" : "AI+Web",
+            (true, false) => sources.Contains(GuidanceSource.KnowledgeBase) ? "AI+KB" : "AI",
+            (false, true) => sources.Contains(GuidanceSource.KnowledgeBase) ? "Web+KB" : "Web",
+            _ => sources.Contains(GuidanceSource.KnowledgeBase) ? "Local+KB" : "Local"
         };
     }
 }

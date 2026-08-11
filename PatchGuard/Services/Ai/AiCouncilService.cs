@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using System.Text.Json;
 using PatchGuard.Models;
 using PatchGuard.Services.Health;
@@ -15,6 +14,7 @@ public sealed class AiCouncilService : IAiCouncilService
 
     private readonly OpenAiChatClient _openAi;
     private readonly IWebSearchService _webSearch;
+    private readonly IKnowledgeRetrievalService _knowledge;
     private readonly IHealthScorePolicy _healthScorePolicy;
     private readonly ICouncilEvaluationService _evaluationService;
     private readonly LocalCouncilSession _localSession;
@@ -22,11 +22,13 @@ public sealed class AiCouncilService : IAiCouncilService
     public AiCouncilService(
         OpenAiChatClient openAi,
         IWebSearchService webSearch,
+        IKnowledgeRetrievalService knowledge,
         IHealthScorePolicy healthScorePolicy,
         ICouncilEvaluationService evaluationService)
     {
         _openAi = openAi;
         _webSearch = webSearch;
+        _knowledge = knowledge;
         _healthScorePolicy = healthScorePolicy;
         _evaluationService = evaluationService;
         _localSession = new LocalCouncilSession(healthScorePolicy);
@@ -41,11 +43,31 @@ public sealed class AiCouncilService : IAiCouncilService
     {
         var stopwatch = Stopwatch.StartNew();
         var reporter = new CouncilProgressReporter(progress);
+
+        // Local KB retrieval does not leave the machine — no external consent required.
+        reporter.SetPhase(CouncilPhaseType.Research, "Retrieving local playbooks…");
+        IReadOnlyList<KnowledgeHit> knowledgeHits = [];
+        try
+        {
+            knowledgeHits = await _knowledge.RetrieveForFindingsAsync(
+                findings,
+                cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Retrieval is best-effort; guidance must still run from scan-native rules.
+            knowledgeHits = [];
+        }
+
         RepairGuide guide;
         if (!allowExternalServices || (!_openAi.IsConfigured && !_webSearch.IsConfigured))
         {
             guide = await _localSession.RunAsync(
-                scenario, findings, [], [], reporter, cancellationToken);
+                scenario, findings, [], [], knowledgeHits, reporter, cancellationToken);
         }
         else
         {
@@ -55,9 +77,16 @@ public sealed class AiCouncilService : IAiCouncilService
 
             guide = !_openAi.IsConfigured
                 ? await _localSession.RunAsync(
-                    scenario, findings, allWeb, searchBundles, reporter, cancellationToken)
+                    scenario, findings, allWeb, searchBundles, knowledgeHits, reporter, cancellationToken)
                 : await RunOpenAiCouncilAsync(
-                    scenario, findings, context, allWeb, searchBundles, reporter, cancellationToken);
+                    scenario,
+                    findings,
+                    context,
+                    allWeb,
+                    searchBundles,
+                    knowledgeHits,
+                    reporter,
+                    cancellationToken);
         }
 
         await SaveEvaluationAsync(scenario, guide, stopwatch.Elapsed, cancellationToken);
@@ -108,12 +137,14 @@ public sealed class AiCouncilService : IAiCouncilService
         string context,
         IReadOnlyList<WebSearchResult> webResults,
         IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> searchBundles,
+        IReadOnlyList<KnowledgeHit> knowledgeHits,
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
         var messages = new List<CouncilMessage>();
         var transcript = new List<(string Role, string Content)>();
         var webBlock = FormatWebResults(webResults);
+        var kbBlock = KnowledgeRetrievalService.FormatHits(knowledgeHits);
 
         foreach (var phase in new[]
                  {
@@ -146,6 +177,9 @@ public sealed class AiCouncilService : IAiCouncilService
 
                     Scenario context:
                     {context}
+
+                    Local knowledge base:
+                    {kbBlock}
 
                     Web research:
                     {webBlock}
@@ -184,7 +218,7 @@ public sealed class AiCouncilService : IAiCouncilService
         var debateText = FormatTranscript(messages);
         var chiefRaw = await _openAi.CompleteAsync(
             CouncilAgents.GetSystemPrompt(CouncilAgents.ChiefCouncilor),
-            $"Scenario: {scenario.GetTitle()}\n\nScan:\n{context}\n\nFull debate:\n{debateText}\n\nWeb:\n{webBlock}",
+            $"Scenario: {scenario.GetTitle()}\n\nScan:\n{context}\n\nFull debate:\n{debateText}\n\nLocal KB:\n{kbBlock}\n\nWeb:\n{webBlock}",
             cancellationToken: cancellationToken);
 
         var guide = await ParseChiefResponseAsync(
@@ -194,6 +228,7 @@ public sealed class AiCouncilService : IAiCouncilService
             messages,
             webResults,
             searchBundles,
+            knowledgeHits,
             cancellationToken);
         reporter.EmitChief(guide.ChiefVerdict);
         return guide;
@@ -206,9 +241,11 @@ public sealed class AiCouncilService : IAiCouncilService
         IReadOnlyList<CouncilMessage> debate,
         IReadOnlyList<WebSearchResult> webResults,
         IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> searchBundles,
+        IReadOnlyList<KnowledgeHit> knowledgeHits,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var kbReferences = KnowledgeRetrievalService.ToReferences(knowledgeHits);
 
         try
         {
@@ -237,10 +274,12 @@ public sealed class AiCouncilService : IAiCouncilService
                     HealthScore = _healthScorePolicy.Calculate(findings),
                     CouncilDiscussion = debate,
                     Steps = steps,
-                    Sources = references.Count == 0
-                        ? [GuidanceSource.Local, GuidanceSource.AiGenerated]
-                        : [GuidanceSource.Local, GuidanceSource.AiGenerated, GuidanceSource.WebSourced],
-                    WebReferences = references
+                    WebReferences = references,
+                    KnowledgeReferences = kbReferences,
+                    Sources = GuidanceSourceBuilder.Build(
+                        hasAi: true,
+                        hasWeb: references.Count > 0,
+                        hasKnowledgeBase: kbReferences.Count > 0)
                 };
             }
         }
@@ -255,6 +294,7 @@ public sealed class AiCouncilService : IAiCouncilService
             findings,
             webResults,
             searchBundles,
+            knowledgeHits,
             reporter,
             cancellationToken);
 
@@ -266,9 +306,11 @@ public sealed class AiCouncilService : IAiCouncilService
             CouncilDiscussion = debate,
             Steps = local.Steps,
             WebReferences = local.WebReferences,
-            Sources = local.WebReferences.Count == 0
-                ? [GuidanceSource.Local, GuidanceSource.AiGenerated]
-                : [GuidanceSource.Local, GuidanceSource.AiGenerated, GuidanceSource.WebSourced]
+            KnowledgeReferences = local.KnowledgeReferences,
+            Sources = GuidanceSourceBuilder.Build(
+                hasAi: true,
+                hasWeb: local.WebReferences.Count > 0,
+                hasKnowledgeBase: local.KnowledgeReferences.Count > 0)
         };
     }
 

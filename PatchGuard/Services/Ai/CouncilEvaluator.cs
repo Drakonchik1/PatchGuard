@@ -73,11 +73,17 @@ public sealed class CouncilEvaluator
 
     private static bool HasCoherentProvenance(RepairGuide guide)
     {
-        var hasExternalArtifacts = guide.WebReferences.Count > 0 ||
-                                   guide.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LinkUrl));
+        var hasWebArtifacts = guide.WebReferences.Count > 0 ||
+                              guide.Steps.Any(step => !string.IsNullOrWhiteSpace(step.LinkUrl));
         var hasWebSource = guide.Sources.Contains(GuidanceSource.WebSourced);
+        if (hasWebArtifacts != hasWebSource)
+        {
+            return false;
+        }
 
-        if (hasExternalArtifacts != hasWebSource)
+        var hasKbArtifacts = guide.KnowledgeReferences.Count > 0;
+        var hasKbSource = guide.Sources.Contains(GuidanceSource.KnowledgeBase);
+        if (hasKbArtifacts != hasKbSource)
         {
             return false;
         }

@@ -85,6 +85,7 @@ public sealed class CouncilConsistencyTests
             [finding],
             [],
             [],
+            [],
             new CouncilProgressReporter(null),
             CancellationToken.None);
 
@@ -103,8 +104,27 @@ public sealed class CouncilConsistencyTests
         return new AiCouncilService(
             openAi,
             new StubWebSearch(webResults),
+            new EmptyKnowledgeRetrievalService(),
             policy,
             new NoOpCouncilEvaluationService());
+    }
+
+    private sealed class EmptyKnowledgeRetrievalService : IKnowledgeRetrievalService
+    {
+        public Task EnsureIndexedAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<IReadOnlyList<KnowledgeHit>> RetrieveAsync(
+            string query,
+            int topK = 3,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeHit>>([]);
+
+        public Task<IReadOnlyList<KnowledgeHit>> RetrieveForFindingsAsync(
+            IReadOnlyList<Finding> findings,
+            int topKPerQuery = 3,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<KnowledgeHit>>([]);
     }
 
     private static Finding CreateFinding(FindingSeverity severity) =>

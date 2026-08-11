@@ -33,6 +33,7 @@ public static class DependencyInjection
         {
             ApiKey = configuration[$"{AiOptions.OpenAiSection}:ApiKey"] ?? string.Empty,
             Model = configuration[$"{AiOptions.OpenAiSection}:Model"] ?? "gpt-4o-mini",
+            EmbeddingModel = configuration[$"{AiOptions.OpenAiSection}:EmbeddingModel"] ?? "text-embedding-3-small",
             WebSearchProvider = configuration[$"{AiOptions.WebSearchSection}:Provider"] ?? "tavily",
             WebSearchApiKey = configuration[$"{AiOptions.WebSearchSection}:ApiKey"] ?? string.Empty
         };
@@ -43,7 +44,13 @@ public static class DependencyInjection
             options.UseSqlite($"Data Source={dbPath}"));
 
         services.AddHttpClient<OpenAiChatClient>();
+        services.AddHttpClient<OpenAiEmbeddingService>();
         services.AddHttpClient<TavilyWebSearchService>();
+
+        // Local KB must stay offline: hashing embeddings only (no OpenAI upload without consent).
+        services.AddSingleton<HashingEmbeddingService>();
+        services.AddSingleton<IEmbeddingService>(sp => sp.GetRequiredService<HashingEmbeddingService>());
+        services.AddSingleton<IKnowledgeRetrievalService, KnowledgeRetrievalService>();
 
         services.AddSingleton<ScanSessionState>();
         services.AddSingleton<MainViewModel>();

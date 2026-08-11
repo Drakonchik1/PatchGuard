@@ -16,7 +16,7 @@ dotnet run --project PatchGuard/PatchGuard.csproj
 dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj
 ```
 
-133 automated tests cover navigation, scoring, history, AI privacy, diagnostics, and UI contracts.
+145 automated tests cover navigation, scoring, history, AI privacy, diagnostics, RAG retrieval, and UI contracts.
 
 ## Navigation
 

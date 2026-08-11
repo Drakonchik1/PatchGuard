@@ -111,7 +111,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <TextBlock Text="Inspectable references" Style="{StaticResource SectionHeader}" Margin="0,0,0,10"/>
-                        <ItemsControl ItemsSource="{Binding WebReferences}" Margin="0,0,0,20">
+                        <ItemsControl ItemsSource="{Binding WebReferences}" Margin="0,0,0,10">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type models:WebReference}">
                                     <Border Background="#1E1E24" CornerRadius="6" Padding="12" Margin="0,0,0,10">
@@ -125,6 +125,24 @@
                                                     HorizontalAlignment="Left"
                                                     Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding Url}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding KnowledgeReferences}" Margin="0,0,0,20">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:KnowledgeReference}">
+                                    <Border Background="#1E1E24" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding PlaybookId, StringFormat='Local KB · {0}'}"
+                                                       Style="{StaticResource MetricLabel}" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding UsedFor, StringFormat='Used for: {0}'}"
+                                                       Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding Score, StringFormat='Relevance: {0:P0}'}"
+                                                       Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

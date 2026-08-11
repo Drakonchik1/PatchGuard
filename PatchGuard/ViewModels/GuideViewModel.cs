@@ -46,6 +46,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     public ObservableCollection<CouncilMessage> CouncilMessages { get; } = [];
     public ObservableCollection<FixStep> FixSteps { get; } = [];
     public ObservableCollection<WebReference> WebReferences { get; } = [];
+    public ObservableCollection<KnowledgeReference> KnowledgeReferences { get; } = [];
     public ObservableCollection<ScanMetric> ScanMetrics { get; } = [];
     public ObservableCollection<string> SourceLabels { get; } = [];
 
@@ -160,6 +161,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         CouncilMessages.Clear();
         FixSteps.Clear();
         WebReferences.Clear();
+        KnowledgeReferences.Clear();
         ScanMetrics.Clear();
         SourceLabels.Clear();
         ChiefVerdict = string.Empty;
@@ -276,6 +278,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
                 GuidanceSource.Local => "Local diagnostic data",
                 GuidanceSource.AiGenerated => "AI-generated advice",
                 GuidanceSource.WebSourced => "Web-sourced research",
+                GuidanceSource.KnowledgeBase => "Local knowledge base",
                 _ => "Source unavailable"
             });
         }
@@ -296,6 +299,12 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         foreach (var reference in guide.WebReferences)
         {
             WebReferences.Add(reference);
+        }
+
+        KnowledgeReferences.Clear();
+        foreach (var reference in guide.KnowledgeReferences)
+        {
+            KnowledgeReferences.Add(reference);
         }
     }
 
