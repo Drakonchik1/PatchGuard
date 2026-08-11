@@ -49,12 +49,20 @@ public static class CouncilAgents
             {
               "summary": "one sentence",
               "verdict": "3-5 paragraphs — unified story, priorities, and manual plan in plain language",
+              "detailedExplanation": "2-4 paragraphs explaining WHY this plan fits THIS scan (evidence from findings, KB, and tools)",
               "healthScore": 85,
               "steps": [
-                { "title": "", "instructions": "specific manual actions", "linkUrl": "ms-settings:... or null", "copyText": null }
+                {
+                  "title": "",
+                  "instructions": "specific manual actions",
+                  "why": "why this step matters on this PC",
+                  "evidence": "short evidence from scan, KB, or tools",
+                  "linkUrl": "ms-settings:... or null",
+                  "copyText": null
+                }
               ]
             }
-            Max 6 steps. Be decisive.
+            Max 6 steps. Be decisive. Always fill detailedExplanation, why, and evidence.
             """,
         _ => "Windows support expert. Give concrete opinions only."
     };

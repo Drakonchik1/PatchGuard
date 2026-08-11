@@ -9,6 +9,7 @@
 - AI Phase 0: golden eval harness + baseline docs.
 - AI Phase 1 RAG: local playbook KB, retrieval, KnowledgeBase provenance (offline embeddings).
 - AI Phase 2 Local LLM: Ollama via `IChatCompletionProvider`, Auto/OpenAI/Ollama/Rules, council without cloud key, `Ollama` / `Ollama+KB` eval labels.
+- AI Phase 3 Agentic: `CouncilAgentGraph` (conditional path) + SK read-only tools (`query_knowledge_base`, `get_local_status`) + detailed Guide explanations.
 - Docs: `docs/AI_ROADMAP.md`, `docs/OLLAMA_SETUP.md`, updated README.
 - Security hardening: launch URI policy, EF factory, sanitizer allowlist, navigation fixes.
 
@@ -34,10 +35,9 @@ To use another model: `ollama pull <name>` then set `Ollama:Model` — see `docs
 ### AI — still planned
 1. n8n KB reindex → JSON export.
 2. Settings UI radio for ChatProvider (config-only today).
-3. Semantic Kernel agentic graph + ≥2 read-only tools.
-4. Microsoft.ML anomaly model + test metrics.
-5. Azure OpenAI adapter + cloud doc.
-6. CI golden regression gate.
+3. Microsoft.ML anomaly model + test metrics.
+4. Azure OpenAI adapter + cloud doc.
+5. CI golden regression gate.
 
 ## Key files
 
@@ -46,6 +46,8 @@ To use another model: `ollama pull <name>` then set `Ollama:Model` — see `docs
 | Chat providers | `PatchGuard/Services/Ai/IChatCompletionProvider.cs`, `OllamaChatProvider.cs`, `OpenAiChatClient.cs` |
 | Provider select | `PatchGuard/Services/Ai/ChatProviderResolver.cs` |
 | Council | `PatchGuard/Services/Ai/AiCouncilService.cs` |
+| Agentic graph | `PatchGuard/Services/Ai/CouncilAgentGraph.cs`, `SemanticKernelToolHost.cs` |
+| Read-only tools | `PatchGuard/Services/Ai/Tools/CouncilReadOnlyTools.cs` |
 | RAG | `PatchGuard/Services/Ai/KnowledgeRetrievalService.cs` |
 | AI plan | `docs/AI_ROADMAP.md` |
 | Ollama howto | `docs/OLLAMA_SETUP.md` |

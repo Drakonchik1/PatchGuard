@@ -56,7 +56,7 @@ public sealed class KnowledgeRetrievalTests
         var options = new AiOptions();
         var openAi = new OpenAiChatClient(new HttpClient(new RejectingHandler()), options);
         var ollama = new OllamaChatProvider(new HttpClient(new RejectingHandler()), options);
-        var service = new AiCouncilService(
+        var service = CouncilTestFactory.CreateCouncilService(
             new ChatProviderResolver(openAi, ollama, options),
             new DisabledWebSearch(),
             retrieval,

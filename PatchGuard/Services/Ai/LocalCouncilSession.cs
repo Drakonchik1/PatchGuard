@@ -175,11 +175,12 @@ public sealed class LocalCouncilSession
         await Task.Delay(400, cancellationToken);
         reporter.DeactivateAgents();
 
-        var chiefVerdict = BuildChiefVerdict(scenario, findings, warnings, messages, webResults);
+        var chiefVerdict = BuildChiefVerdict(scenario, findings, warnings, messages, webResults, knowledgeHits);
+        var detailedExplanation = BuildDetailedExplanation(scenario, findings, warnings, knowledgeHits, webResults);
         var actionableWarnings = warnings
             .Where(finding => finding.ActionState == FindingActionState.Recommended)
             .ToList();
-        var steps = BuildSteps(findings, actionableWarnings);
+        var steps = BuildSteps(findings, actionableWarnings, knowledgeHits);
         var healthScore = _healthScorePolicy.Calculate(findings);
         var summary = healthScore >= 80
             ? "System health good — preventive actions recommended."
@@ -193,6 +194,7 @@ public sealed class LocalCouncilSession
         {
             Summary = summary,
             ChiefVerdict = chiefVerdict,
+            DetailedExplanation = detailedExplanation,
             HealthScore = healthScore,
             CouncilDiscussion = messages,
             Steps = steps,
@@ -382,7 +384,8 @@ public sealed class LocalCouncilSession
         IReadOnlyList<Finding> findings,
         List<Finding> warnings,
         IReadOnlyList<CouncilMessage> debate,
-        IReadOnlyList<WebSearchResult> webResults)
+        IReadOnlyList<WebSearchResult> webResults,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Chief decision for \"{scenario.GetTitle()}\" after two debate rounds.");
@@ -397,6 +400,13 @@ public sealed class LocalCouncilSession
         else
         {
             sb.AppendLine($"We confirmed {warnings.Count} warning-level item(s). The Technician prioritised concrete fixes; the Skeptic blocked elevated or destructive actions; the Researcher aligned patterns from {(webResults.Count > 0 ? "web threads and local KB" : "local knowledge-base playbooks")}.");
+            if (knowledgeHits.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine(
+                    $"Grounding: local playbook \"{knowledgeHits[0].Chunk.Title}\" ({knowledgeHits[0].Chunk.PlaybookId}) matched this scan.");
+            }
+
             sb.AppendLine();
             sb.AppendLine("Unified plan:");
             var step = 1;
@@ -413,10 +423,61 @@ public sealed class LocalCouncilSession
         return sb.ToString().Trim();
     }
 
-    private static IReadOnlyList<FixStep> BuildSteps(IReadOnlyList<Finding> findings, List<Finding> warnings)
+    private static string BuildDetailedExplanation(
+        ScanScenario scenario,
+        IReadOnlyList<Finding> findings,
+        List<Finding> warnings,
+        IReadOnlyList<KnowledgeHit> knowledgeHits,
+        IReadOnlyList<WebSearchResult> webResults)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(
+            $"Why this plan for \"{scenario.GetTitle()}\": we ranked {findings.Count} scan signal(s) and focused on {warnings.Count} warning/critical item(s).");
+        sb.AppendLine();
+
+        if (warnings.Count == 0)
+        {
+            sb.AppendLine(
+                "No Warning or Critical findings means the council skipped aggressive repair and recommended a baseline capture instead. That keeps you from changing a healthy system without evidence.");
+        }
+        else
+        {
+            sb.AppendLine("Each recommended step maps to a Recommended finding from this scan. We order by severity so the highest-impact issue is handled first.");
+            foreach (var warning in warnings.Take(3))
+            {
+                sb.AppendLine($"• {warning.Title} ({warning.Severity}): {Trim(warning.Details, 160)}");
+            }
+        }
+
+        sb.AppendLine();
+        if (knowledgeHits.Count > 0)
+        {
+            sb.AppendLine(
+                $"Local KB support: {string.Join("; ", knowledgeHits.Take(3).Select(h => $"{h.Chunk.Title} [{h.Chunk.PlaybookId}]"))}.");
+        }
+        else
+        {
+            sb.AppendLine("Local KB had no strong playbook match; steps stay grounded in scan-native rules only.");
+        }
+
+        if (webResults.Count > 0)
+        {
+            sb.AppendLine($"Web snippets consulted: {webResults.Count} (consent-gated).");
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    private static IReadOnlyList<FixStep> BuildSteps(
+        IReadOnlyList<Finding> findings,
+        List<Finding> warnings,
+        IReadOnlyList<KnowledgeHit> knowledgeHits)
     {
         var steps = new List<FixStep>();
         var order = 1;
+        var kbEvidence = knowledgeHits.Count > 0
+            ? $"KB: {knowledgeHits[0].Chunk.Title} ({knowledgeHits[0].Chunk.PlaybookId})"
+            : null;
 
         foreach (var finding in warnings)
         {
@@ -427,7 +488,9 @@ public sealed class LocalCouncilSession
                     Order = order++,
                     Title = "Free disk space",
                     Instructions = "Settings → System → Storage → turn on Storage Sense → run cleanup on temp files. Uninstall 1–2 large unused apps. Empty Recycle Bin.",
-                    LinkUrl = "ms-settings:storagesense"
+                    LinkUrl = "ms-settings:storagesense",
+                    WhyThisMatters = "Low free space blocks Windows Update staging and increases update-failure risk.",
+                    Evidence = $"Scan: {finding.Title}. {kbEvidence ?? "Rules: disk-space playbook."}"
                 });
                 continue;
             }
@@ -439,7 +502,9 @@ public sealed class LocalCouncilSession
                     Order = order++,
                     Title = "Inspect update services",
                     Instructions = "Press Win+R, type services.msc, find Windows Update and BITS. If stopped and Start is greyed out, you need an admin account — note status for IT.",
-                    CopyText = "services.msc"
+                    CopyText = "services.msc",
+                    WhyThisMatters = "Stopped update services prevent patches from downloading or installing.",
+                    Evidence = $"Scan: {finding.Title} — {Trim(finding.Details, 120)}. {kbEvidence ?? "Rules: update-services check."}"
                 });
                 continue;
             }
@@ -449,7 +514,9 @@ public sealed class LocalCouncilSession
                 Order = order++,
                 Title = finding.Title,
                 Instructions = LocalKnowledgeBase.GetTechnicianOpinion(finding),
-                LinkUrl = finding.ModuleName == "Windows Update history" ? "ms-settings:windowsupdate" : null
+                LinkUrl = finding.ModuleName == "Windows Update history" ? "ms-settings:windowsupdate" : null,
+                WhyThisMatters = $"{finding.Severity} finding in {finding.ModuleName} should be resolved before stacking more changes.",
+                Evidence = $"Scan evidence: {Trim(finding.Details, 160)}. {kbEvidence ?? "Rules: technician playbook."}"
             });
         }
 
@@ -463,7 +530,11 @@ public sealed class LocalCouncilSession
                 Instructions = os is not null
                     ? $"Record: {os.Title}. Compare after the next patch."
                     : "Record build and disk space from Settings → About.",
-                LinkUrl = "ms-settings:about"
+                LinkUrl = "ms-settings:about",
+                WhyThisMatters = "A clean scan still benefits from a dated baseline so the next patch can be compared honestly.",
+                Evidence = os is not null
+                    ? $"OS signal: {os.Title}."
+                    : "No warning findings — preventive baseline only."
             });
         }
 

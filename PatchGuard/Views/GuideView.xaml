@@ -189,6 +189,13 @@
                             </Grid>
                             <TextBlock Text="{Binding ChiefVerdict}" TextWrapping="Wrap" LineHeight="24"
                                        Foreground="{StaticResource TextPrimaryBrush}" FontSize="14"/>
+                            <StackPanel Margin="0,20,0,0"
+                                        Visibility="{Binding DetailedExplanation, Converter={StaticResource NullVis}}">
+                                <TextBlock Text="Why we recommend this" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10"/>
+                                <TextBlock Text="{Binding DetailedExplanation}" TextWrapping="Wrap" LineHeight="22"
+                                           Foreground="{StaticResource TextMutedBrush}" FontSize="13"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -239,6 +246,14 @@
                                                            Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
                                                 <TextBlock Text="{Binding Instructions}" TextWrapping="Wrap"
                                                            Style="{StaticResource SubtleText}"/>
+                                                <TextBlock Text="{Binding WhyThisMatters}" TextWrapping="Wrap"
+                                                           Margin="0,10,0,0" FontSize="12" LineHeight="18"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           Visibility="{Binding WhyThisMatters, Converter={StaticResource NullVis}}"/>
+                                                <TextBlock Text="{Binding Evidence, StringFormat=Evidence: {0}}" TextWrapping="Wrap"
+                                                           Margin="0,8,0,0" FontSize="12" LineHeight="18"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           Visibility="{Binding Evidence, Converter={StaticResource NullVis}}"/>
                                                 <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                                                     <Button Content="Open" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0"
                                                             Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"

@@ -214,7 +214,7 @@ public sealed class AiPrivacyAndProvenanceTests
             new HttpClient(ollamaHandler ?? new CapturingOllamaHandler()),
             options);
         var resolver = new ChatProviderResolver(openAi, ollama, options);
-        return new AiCouncilService(
+        return CouncilTestFactory.CreateCouncilService(
             resolver,
             search,
             new EmptyKnowledgeRetrievalService(),
