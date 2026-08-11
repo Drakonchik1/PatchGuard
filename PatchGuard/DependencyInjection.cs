@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PatchGuard.Data;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
+using PatchGuard.Services.Ai.Tools;
 using PatchGuard.Services.Diagnostics;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.Health;
@@ -67,6 +68,9 @@ public static class DependencyInjection
         services.AddSingleton<HashingEmbeddingService>();
         services.AddSingleton<IEmbeddingService>(sp => sp.GetRequiredService<HashingEmbeddingService>());
         services.AddSingleton<IKnowledgeRetrievalService, KnowledgeRetrievalService>();
+        services.AddSingleton<CouncilReadOnlyTools>();
+        services.AddSingleton<SemanticKernelToolHost>();
+        services.AddSingleton<CouncilAgentGraph>();
 
         services.AddSingleton<ScanSessionState>();
         services.AddSingleton<MainViewModel>();

@@ -4,6 +4,10 @@ public sealed class RepairGuide
 {
     public required string Summary { get; init; }
     public required string ChiefVerdict { get; init; }
+
+    /// <summary>Longer “why we recommend this” narrative for the Guide UI.</summary>
+    public string? DetailedExplanation { get; init; }
+
     public int HealthScore { get; init; }
     public IReadOnlyList<CouncilMessage> CouncilDiscussion { get; init; } = [];
     public IReadOnlyList<FixStep> Steps { get; init; } = [];

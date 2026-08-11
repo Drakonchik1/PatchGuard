@@ -167,7 +167,7 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | 0 — Quality metrics / golden eval | Done |
 | 1 — RAG + local KB provenance | Done (n8n export still planned) |
 | 2 — Local LLM (Ollama) | Done (Settings radio still planned) |
-| 3 — Agentic graph (Semantic Kernel) | Planned |
+| 3 — Agentic graph (Semantic Kernel) | Done |
 | 4 — Classic ML (Microsoft.ML) | Planned |
 | 5 — Azure OpenAI adapter | Planned |
 | 6 — CI regression gate | Planned |

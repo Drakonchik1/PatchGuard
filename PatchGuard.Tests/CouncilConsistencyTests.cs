@@ -105,7 +105,7 @@ public sealed class CouncilConsistencyTests
             new HttpClient(new StubOpenAiHandler()),
             options);
         var resolver = new ChatProviderResolver(openAi, ollama, options);
-        return new AiCouncilService(
+        return CouncilTestFactory.CreateCouncilService(
             resolver,
             new StubWebSearch(webResults),
             new EmptyKnowledgeRetrievalService(),

@@ -57,6 +57,9 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     private string _chiefVerdict = string.Empty;
 
     [ObservableProperty]
+    private string _detailedExplanation = string.Empty;
+
+    [ObservableProperty]
     private string _councilStatus = string.Empty;
 
     [ObservableProperty]
@@ -165,6 +168,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         ScanMetrics.Clear();
         SourceLabels.Clear();
         ChiefVerdict = string.Empty;
+        DetailedExplanation = string.Empty;
         Summary = string.Empty;
         HealthScore = 0;
         ErrorMessage = null;
@@ -269,6 +273,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     {
         Summary = guide.Summary;
         ChiefVerdict = guide.ChiefVerdict;
+        DetailedExplanation = guide.DetailedExplanation ?? string.Empty;
         HealthScore = guide.HealthScore;
         SourceLabels.Clear();
         foreach (var source in guide.Sources.Distinct())

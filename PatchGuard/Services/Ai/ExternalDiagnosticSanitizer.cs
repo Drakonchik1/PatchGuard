@@ -56,7 +56,7 @@ public static class ExternalDiagnosticSanitizer
             .ToList();
     }
 
-    private static string SanitizeCategory(string value)
+    public static string SanitizeCategory(string value)
     {
         var trimmed = value.Trim();
         foreach (var known in KnownCategories)

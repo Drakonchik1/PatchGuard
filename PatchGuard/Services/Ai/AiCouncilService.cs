@@ -17,6 +17,7 @@ public sealed class AiCouncilService : IAiCouncilService
     private readonly IKnowledgeRetrievalService _knowledge;
     private readonly IHealthScorePolicy _healthScorePolicy;
     private readonly ICouncilEvaluationService _evaluationService;
+    private readonly CouncilAgentGraph _agentGraph;
     private readonly LocalCouncilSession _localSession;
 
     public AiCouncilService(
@@ -24,13 +25,15 @@ public sealed class AiCouncilService : IAiCouncilService
         IWebSearchService webSearch,
         IKnowledgeRetrievalService knowledge,
         IHealthScorePolicy healthScorePolicy,
-        ICouncilEvaluationService evaluationService)
+        ICouncilEvaluationService evaluationService,
+        CouncilAgentGraph agentGraph)
     {
         _chatResolver = chatResolver;
         _webSearch = webSearch;
         _knowledge = knowledge;
         _healthScorePolicy = healthScorePolicy;
         _evaluationService = evaluationService;
+        _agentGraph = agentGraph;
         _localSession = new LocalCouncilSession(healthScorePolicy);
     }
 
@@ -168,92 +171,22 @@ public sealed class AiCouncilService : IAiCouncilService
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
-        var messages = new List<CouncilMessage>();
-        var transcript = new List<(string Role, string Content)>();
-        var webBlock = FormatWebResults(webResults);
-        var kbBlock = KnowledgeRetrievalService.FormatHits(knowledgeHits);
-
-        foreach (var phase in new[]
-                 {
-                     CouncilPhaseType.Analysis,
-                     CouncilPhaseType.Research,
-                     CouncilPhaseType.Debate,
-                     CouncilPhaseType.Rebuttal
-                 })
-        {
-            reporter.SetPhase(phase, phase switch
-            {
-                CouncilPhaseType.Analysis => "Council analyzing scan…",
-                CouncilPhaseType.Research => "Council processing research…",
-                CouncilPhaseType.Debate => "Debate round 1…",
-                CouncilPhaseType.Rebuttal => "Debate round 2 — final positions…",
-                _ => "Council working…"
-            });
-
-            var round = phase is CouncilPhaseType.Debate or CouncilPhaseType.Rebuttal
-                ? (phase == CouncilPhaseType.Debate ? 1 : 2)
-                : 1;
-
-            foreach (var agent in CouncilAgents.Debaters)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                reporter.SetAgentActive(agent, phase.ToString(), phase);
-
-                var userPrompt = $"""
-                    {CouncilAgents.GetPhasePrompt(agent, phase)}
-
-                    Scenario context:
-                    {context}
-
-                    Local knowledge base:
-                    {kbBlock}
-
-                    Web research:
-                    {webBlock}
-
-                    Debate transcript:
-                    {FormatTranscript(messages)}
-                    """;
-
-                var reply = await chat.CompleteAsync(
-                    CouncilAgents.GetSystemPrompt(agent),
-                    userPrompt,
-                    transcript,
-                    cancellationToken);
-
-                var (headline, body) = SplitHeadline(reply);
-                var message = new CouncilMessage
-                {
-                    AgentRole = agent,
-                    Phase = phase,
-                    Round = round,
-                    Headline = headline,
-                    Confidence = 70 + round * 5,
-                    Content = body
-                };
-
-                messages.Add(reporter.EmitMessage(message));
-                transcript.Add(("user", userPrompt));
-                transcript.Add(("assistant", reply));
-                await Task.Delay(150, cancellationToken);
-            }
-        }
-
-        reporter.SetPhase(CouncilPhaseType.Verdict, "Chief Councilor deciding…");
-        reporter.DeactivateAgents();
-
-        var debateText = FormatTranscript(messages);
-        var chiefRaw = await chat.CompleteAsync(
-            CouncilAgents.GetSystemPrompt(CouncilAgents.ChiefCouncilor),
-            $"Scenario: {scenario.GetTitle()}\n\nScan:\n{context}\n\nFull debate:\n{debateText}\n\nLocal KB:\n{kbBlock}\n\nWeb:\n{webBlock}",
-            cancellationToken: cancellationToken);
+        var graphResult = await _agentGraph.RunAsync(
+            chat,
+            scenario,
+            findings,
+            context,
+            webResults,
+            knowledgeHits,
+            reporter,
+            cancellationToken);
 
         var guide = await ParseChiefResponseAsync(
-            chiefRaw,
+            graphResult.ChiefRaw,
             chat.Name,
             scenario,
             findings,
-            messages,
+            graphResult.Messages,
             webResults,
             searchBundles,
             knowledgeHits,
@@ -288,6 +221,8 @@ public sealed class AiCouncilService : IAiCouncilService
                         Order = i + 1,
                         Title = s.Title ?? $"Step {i + 1}",
                         Instructions = s.Instructions ?? string.Empty,
+                        WhyThisMatters = NullIfWhiteSpace(s.Why),
+                        Evidence = NullIfWhiteSpace(s.Evidence),
                         LinkUrl = ExternalUrlPolicy.TryNormalize(s.LinkUrl, out var link)
                             ? link!.AbsoluteUri
                             : null,
@@ -300,6 +235,7 @@ public sealed class AiCouncilService : IAiCouncilService
                 {
                     Summary = parsed.Summary ?? "Council decision ready.",
                     ChiefVerdict = parsed.Verdict,
+                    DetailedExplanation = NullIfWhiteSpace(parsed.DetailedExplanation),
                     HealthScore = _healthScorePolicy.Calculate(findings),
                     CouncilDiscussion = debate,
                     Steps = steps,
@@ -332,6 +268,7 @@ public sealed class AiCouncilService : IAiCouncilService
         {
             Summary = local.Summary,
             ChiefVerdict = local.ChiefVerdict,
+            DetailedExplanation = local.DetailedExplanation,
             HealthScore = local.HealthScore,
             CouncilDiscussion = debate,
             Steps = local.Steps,
@@ -345,23 +282,8 @@ public sealed class AiCouncilService : IAiCouncilService
         };
     }
 
-    private static (string Headline, string Body) SplitHeadline(string reply)
-    {
-        var lines = reply.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (lines.Length == 0)
-        {
-            return ("Council note", reply);
-        }
-
-        var headline = lines[0].Length > 60 ? lines[0][..60] + "…" : lines[0];
-        var body = lines.Length > 1 ? string.Join(" ", lines.Skip(1)) : lines[0];
-        return (headline, body);
-    }
-
-    private static string FormatTranscript(IReadOnlyList<CouncilMessage> messages) =>
-        messages.Count == 0
-            ? "(no debate yet)"
-            : string.Join("\n", messages.Select(m => $"[{m.Phase} R{m.Round} {m.AgentRole}]: {m.Content}"));
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string ExtractJson(string text)
     {
@@ -370,11 +292,6 @@ public sealed class AiCouncilService : IAiCouncilService
         return start >= 0 && end > start ? text[start..(end + 1)] : text;
     }
 
-    private static string FormatWebResults(IReadOnlyList<WebSearchResult> results) =>
-        results.Count == 0
-            ? "(no web results — use your own expertise)"
-            : string.Join("\n", results.Select(r => $"- {r.Title}: {r.Snippet}"));
-
     private static string Trim(string text, int max) =>
         text.Length <= max ? text : text[..max] + "…";
 
@@ -382,6 +299,7 @@ public sealed class AiCouncilService : IAiCouncilService
     {
         public string? Summary { get; set; }
         public string? Verdict { get; set; }
+        public string? DetailedExplanation { get; set; }
         public List<ChiefStepDto>? Steps { get; set; }
     }
 
@@ -389,6 +307,8 @@ public sealed class AiCouncilService : IAiCouncilService
     {
         public string? Title { get; set; }
         public string? Instructions { get; set; }
+        public string? Why { get; set; }
+        public string? Evidence { get; set; }
         public string? LinkUrl { get; set; }
         public string? CopyText { get; set; }
     }

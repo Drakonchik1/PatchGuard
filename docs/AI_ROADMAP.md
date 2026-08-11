@@ -12,7 +12,7 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases stay i
 | 9 | Quality metrics | 0 | Golden dataset + eval harness (`CouncilEvaluator`) | **Done** |
 | 4 + 2 + 7 | RAG / Generative AI / n8n | 1 | Local KB + retrieval + provenance; n8n reindex → JSON (external) | **Done** (RAG); n8n workflow still **planned** |
 | 5 + 2 | Local LLM / Generative AI | 2 | Ollama provider, council without cloud key | **Done** |
-| 3 + 6 | Agentic AI / LangGraph analog | 3 | Semantic Kernel conditional graph + ≥2 read-only tools | Planned |
+| 3 + 6 | Agentic AI / LangGraph analog | 3 | Semantic Kernel conditional graph + ≥2 read-only tools | **Done** |
 | 1 | Classic ML | 4 | Microsoft.ML anomaly model + metrics in tests | Planned |
 | 8 | Azure / AWS | 5 | Azure OpenAI adapter + cloud setup doc | Planned |
 | 9 | CI regression | 6 | Golden eval gate in CI | Planned (golden tests local today) |
@@ -48,11 +48,14 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases stay i
 
 - Settings UI radio (Cloud / Ollama / Rules) — today config-only via `appsettings`
 
-## Phase 3 — Agentic (planned)
+## Phase 3 — Agentic (done)
 
-- Semantic Kernel (or equivalent) conditional graph
-- ≥2 **read-only** tools (e.g. re-query KB, inspect safe local status)
-- Keep preview/confirm for any future write actions (product Phase 3 guided fixes)
+- `CouncilAgentGraph`: Analyze → (conditional) ToolResearch → Debate → Rebuttal → ExplainVerdict
+- Light path when no Warning/Critical findings (Analyze → Verdict)
+- Semantic Kernel Core hosts read-only `KernelFunction` plugins (`query_knowledge_base`, `get_local_status`)
+- LLM turns stay on `IChatCompletionProvider` (Ollama/OpenAI) — no SK cloud connector required
+- Richer Guide explanations: `DetailedExplanation`, per-step `WhyThisMatters` / `Evidence`
+- No learning / training mode; no write tools (optimizer stays outside the graph)
 
 ## Phase 4 — Classic ML (planned)
 
