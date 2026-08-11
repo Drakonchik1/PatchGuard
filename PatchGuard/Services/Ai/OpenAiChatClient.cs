@@ -6,8 +6,10 @@ using System.Text.Json.Serialization;
 
 namespace PatchGuard.Services.Ai;
 
-public sealed class OpenAiChatClient
+public sealed class OpenAiChatClient : IChatCompletionProvider
 {
+    public const string ProviderName = "OpenAI";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -22,11 +24,18 @@ public sealed class OpenAiChatClient
         _httpClient = httpClient;
         _options = options;
         _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        if (!string.IsNullOrWhiteSpace(options.ApiKey))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        }
     }
 
+    public string Name => ProviderName;
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ApiKey);
+
+    public bool IsAvailable => IsConfigured;
 
     public async Task<string> CompleteAsync(
         string systemPrompt,

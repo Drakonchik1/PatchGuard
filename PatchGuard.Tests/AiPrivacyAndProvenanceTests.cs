@@ -67,12 +67,10 @@ public sealed class AiPrivacyAndProvenanceTests
     {
         var handler = new CapturingOpenAiHandler();
         var search = new CapturingWebSearch([]) { IsConfiguredOverride = false };
-        var service = new AiCouncilService(
-            new OpenAiChatClient(new HttpClient(handler), new AiOptions()),
+        var service = CreateService(
+            handler,
             search,
-            new EmptyKnowledgeRetrievalService(),
-            new HealthScorePolicy(),
-            new NoOpCouncilEvaluationService());
+            options: new AiOptions());
 
         await service.BuildGuideAsync(
             ScanScenario.QuickHealthCheck,
@@ -81,6 +79,62 @@ public sealed class AiPrivacyAndProvenanceTests
 
         Assert.Empty(search.Queries);
         Assert.Empty(handler.Payloads);
+    }
+
+    [Fact]
+    public async Task OllamaCanRunWithoutExternalConsentAndDoesNotCallOpenAi()
+    {
+        var openAiHandler = new CapturingOpenAiHandler();
+        var ollamaHandler = new CapturingOllamaHandler();
+        var search = new CapturingWebSearch([]);
+        var options = new AiOptions
+        {
+            OllamaEnabled = true,
+            OllamaBaseUrl = "http://localhost:11434",
+            OllamaModel = "qwen3.5:latest",
+            ChatProvider = ChatProviderResolver.ModeAuto
+        };
+        var service = CreateService(openAiHandler, search, options: options, ollamaHandler: ollamaHandler);
+
+        var guide = await service.BuildGuideAsync(
+            ScanScenario.QuickHealthCheck,
+            [SensitiveFinding()],
+            allowExternalServices: false);
+
+        Assert.Empty(search.Queries);
+        Assert.Empty(openAiHandler.Payloads);
+        Assert.NotEmpty(ollamaHandler.Payloads);
+        Assert.Contains(GuidanceSource.AiGenerated, guide.Sources);
+        Assert.Equal(OllamaChatProvider.ProviderName, guide.AiProviderName);
+        Assert.DoesNotContain(GuidanceSource.WebSourced, guide.Sources);
+
+        var transmitted = string.Join("\n", ollamaHandler.Payloads);
+        Assert.DoesNotContain("alice", transmitted, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sk-secret-value", transmitted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OllamaFailureFallsBackToLocalRulesWithoutAiSource()
+    {
+        var openAiHandler = new CapturingOpenAiHandler();
+        var ollamaHandler = new FailingOllamaHandler();
+        var search = new CapturingWebSearch([]);
+        var options = new AiOptions
+        {
+            OllamaEnabled = true,
+            ChatProvider = ChatProviderResolver.ModeOllama
+        };
+        var service = CreateService(openAiHandler, search, options: options, ollamaHandler: ollamaHandler);
+
+        var guide = await service.BuildGuideAsync(
+            ScanScenario.QuickHealthCheck,
+            [SensitiveFinding()],
+            allowExternalServices: false);
+
+        Assert.Empty(openAiHandler.Payloads);
+        Assert.Contains(GuidanceSource.Local, guide.Sources);
+        Assert.DoesNotContain(GuidanceSource.AiGenerated, guide.Sources);
+        Assert.Null(guide.AiProviderName);
     }
 
     [Fact]
@@ -150,11 +204,18 @@ public sealed class AiPrivacyAndProvenanceTests
     private static AiCouncilService CreateService(
         CapturingOpenAiHandler handler,
         CapturingWebSearch search,
-        ICouncilEvaluationService? evaluationService = null)
+        ICouncilEvaluationService? evaluationService = null,
+        AiOptions? options = null,
+        HttpMessageHandler? ollamaHandler = null)
     {
-        var options = new AiOptions { ApiKey = "configured", Model = "test-model" };
+        options ??= new AiOptions { ApiKey = "configured", Model = "test-model" };
+        var openAi = new OpenAiChatClient(new HttpClient(handler), options);
+        var ollama = new OllamaChatProvider(
+            new HttpClient(ollamaHandler ?? new CapturingOllamaHandler()),
+            options);
+        var resolver = new ChatProviderResolver(openAi, ollama, options);
         return new AiCouncilService(
-            new OpenAiChatClient(new HttpClient(handler), options),
+            resolver,
             search,
             new EmptyKnowledgeRetrievalService(),
             new HealthScorePolicy(),
@@ -230,6 +291,39 @@ public sealed class AiPrivacyAndProvenanceTests
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
         }
+    }
+
+    private sealed class CapturingOllamaHandler : HttpMessageHandler
+    {
+        public List<string> Payloads { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Payloads.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            const string chiefResponse =
+                """{"summary":"Ready","verdict":"Use measured findings.","steps":[]}""";
+            var payload = JsonSerializer.Serialize(new
+            {
+                message = new { role = "assistant", content = chiefResponse }
+            });
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+        }
+    }
+
+    private sealed class FailingOllamaHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("boom", Encoding.UTF8, "text/plain")
+            });
     }
 
     private sealed class NoOpCouncilEvaluationService : ICouncilEvaluationService

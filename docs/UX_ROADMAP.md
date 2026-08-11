@@ -1,7 +1,7 @@
 # PatchGuard UX and Feature Roadmap
 
-**Branch:** `feature/ux-roadmap`  
-**Last updated:** 2026-07-12
+**Branch:** `main`  
+**Last updated:** 2026-08-11
 
 ## Overview
 
@@ -9,6 +9,9 @@ Redesign PatchGuard around an accessible, task-oriented dashboard and a phased f
 roadmap for everyday Windows users and gamers. Establish consistent navigation,
 reusable UI components, testing, and safety foundations before expanding alerts and
 optimization capabilities.
+
+AI competence phases (RAG, Ollama, Semantic Kernel, ML, Azure) live in
+[AI_ROADMAP.md](AI_ROADMAP.md) — keep both docs in sync when shipping AI work.
 
 ## Phase status
 
@@ -55,11 +58,12 @@ admin requirement, risk, verification status.
 
 ### Optional AI guidance
 
-- Explicit consent checkbox before any external AI/web call.
+- Explicit consent checkbox before any **external** AI/web call (OpenAI / Tavily).
+- Local Ollama LLM and local KB retrieval do **not** require that checkbox.
 - Sanitized categories only (`ExternalDiagnosticSanitizer`); titles, paths, secrets omitted.
-- Source provenance: Local / AI-generated / Web-sourced labels + inspectable references.
+- Source provenance: Local / Local LLM (Ollama) / AI-generated / Web-sourced / Knowledge base + inspectable references.
 - Safe URLs: `ExternalUrlPolicy` (http/https for web), `LaunchUriPolicy` (http/https + `ms-settings:` for fix steps).
-- External calls require configured provider **and** user consent.
+- Chat backend selection via `Ai:ChatProvider` (`Auto` | `OpenAI` | `Ollama` | `Rules`) — see [OLLAMA_SETUP.md](OLLAMA_SETUP.md).
 
 ### EF Core lifetime
 
@@ -81,10 +85,12 @@ admin requirement, risk, verification status.
 
 ## Phase 5: Supporting capabilities (planned)
 
-- Settings: alert thresholds, privacy/AI config, PresentMon path, appearance, elevation prefs.
+- Settings: alert thresholds, privacy/AI config (provider radio Cloud / Ollama / Rules), PresentMon path, appearance, elevation prefs.
 - Secrets in Windows-protected storage (not plain JSON).
 - Reopenable, comparable scan/optimization history.
 - FPS setup improvements: dependency detection, setup guidance, benchmark sessions.
+
+Chat provider is **config-only** today (`appsettings`); Settings UI radio remains planned.
 
 ## Architecture
 
@@ -113,7 +119,7 @@ execution, and persistence live in testable services.
 
 ## Testing and security gates
 
-**Test project:** `PatchGuard.Tests` (133 tests as of this branch).
+**Test project:** `PatchGuard.Tests`.
 
 Coverage includes:
 
@@ -121,6 +127,8 @@ Coverage includes:
 - Health score policy boundaries
 - History persistence and EF factory lifetime
 - AI privacy, consent, URL policies, provenance
+- Ollama / chat provider resolver + fallback
+- RAG knowledge retrieval
 - Diagnostic metadata and orchestrator cancellation
 - Update service health evaluation
 - WPF smoke / journey tests

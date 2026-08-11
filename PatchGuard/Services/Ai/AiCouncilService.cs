@@ -12,7 +12,7 @@ public sealed class AiCouncilService : IAiCouncilService
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly OpenAiChatClient _openAi;
+    private readonly ChatProviderResolver _chatResolver;
     private readonly IWebSearchService _webSearch;
     private readonly IKnowledgeRetrievalService _knowledge;
     private readonly IHealthScorePolicy _healthScorePolicy;
@@ -20,13 +20,13 @@ public sealed class AiCouncilService : IAiCouncilService
     private readonly LocalCouncilSession _localSession;
 
     public AiCouncilService(
-        OpenAiChatClient openAi,
+        ChatProviderResolver chatResolver,
         IWebSearchService webSearch,
         IKnowledgeRetrievalService knowledge,
         IHealthScorePolicy healthScorePolicy,
         ICouncilEvaluationService evaluationService)
     {
-        _openAi = openAi;
+        _chatResolver = chatResolver;
         _webSearch = webSearch;
         _knowledge = knowledge;
         _healthScorePolicy = healthScorePolicy;
@@ -63,22 +63,37 @@ public sealed class AiCouncilService : IAiCouncilService
             knowledgeHits = [];
         }
 
+        var chat = _chatResolver.Resolve(allowExternalServices);
+        var useWeb = allowExternalServices && _webSearch.IsConfigured;
+
         RepairGuide guide;
-        if (!allowExternalServices || (!_openAi.IsConfigured && !_webSearch.IsConfigured))
+        if (chat is null && !useWeb)
         {
             guide = await _localSession.RunAsync(
                 scenario, findings, [], [], knowledgeHits, reporter, cancellationToken);
         }
+        else if (chat is null)
+        {
+            var searchBundles = await RunSearchesAsync(findings, reporter, cancellationToken);
+            var allWeb = searchBundles.SelectMany(b => b.Results).DistinctBy(r => r.Url).ToList();
+            guide = await _localSession.RunAsync(
+                scenario, findings, allWeb, searchBundles, knowledgeHits, reporter, cancellationToken);
+        }
         else
         {
             var context = ExternalDiagnosticSanitizer.BuildContext(scenario, findings);
-            var searchBundles = await RunSearchesAsync(findings, reporter, cancellationToken);
-            var allWeb = searchBundles.SelectMany(b => b.Results).DistinctBy(r => r.Url).ToList();
+            IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> searchBundles = [];
+            IReadOnlyList<WebSearchResult> allWeb = [];
+            if (useWeb)
+            {
+                searchBundles = await RunSearchesAsync(findings, reporter, cancellationToken);
+                allWeb = searchBundles.SelectMany(b => b.Results).DistinctBy(r => r.Url).ToList();
+            }
 
-            guide = !_openAi.IsConfigured
-                ? await _localSession.RunAsync(
-                    scenario, findings, allWeb, searchBundles, knowledgeHits, reporter, cancellationToken)
-                : await RunOpenAiCouncilAsync(
+            try
+            {
+                guide = await RunLlmCouncilAsync(
+                    chat,
                     scenario,
                     findings,
                     context,
@@ -87,6 +102,17 @@ public sealed class AiCouncilService : IAiCouncilService
                     knowledgeHits,
                     reporter,
                     cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Local LLM / cloud failures fall back to deterministic rules.
+                guide = await _localSession.RunAsync(
+                    scenario, findings, allWeb, searchBundles, knowledgeHits, reporter, cancellationToken);
+            }
         }
 
         await SaveEvaluationAsync(scenario, guide, stopwatch.Elapsed, cancellationToken);
@@ -131,7 +157,8 @@ public sealed class AiCouncilService : IAiCouncilService
         return bundles;
     }
 
-    private async Task<RepairGuide> RunOpenAiCouncilAsync(
+    private async Task<RepairGuide> RunLlmCouncilAsync(
+        IChatCompletionProvider chat,
         ScanScenario scenario,
         IReadOnlyList<Finding> findings,
         string context,
@@ -188,7 +215,7 @@ public sealed class AiCouncilService : IAiCouncilService
                     {FormatTranscript(messages)}
                     """;
 
-                var reply = await _openAi.CompleteAsync(
+                var reply = await chat.CompleteAsync(
                     CouncilAgents.GetSystemPrompt(agent),
                     userPrompt,
                     transcript,
@@ -216,13 +243,14 @@ public sealed class AiCouncilService : IAiCouncilService
         reporter.DeactivateAgents();
 
         var debateText = FormatTranscript(messages);
-        var chiefRaw = await _openAi.CompleteAsync(
+        var chiefRaw = await chat.CompleteAsync(
             CouncilAgents.GetSystemPrompt(CouncilAgents.ChiefCouncilor),
             $"Scenario: {scenario.GetTitle()}\n\nScan:\n{context}\n\nFull debate:\n{debateText}\n\nLocal KB:\n{kbBlock}\n\nWeb:\n{webBlock}",
             cancellationToken: cancellationToken);
 
         var guide = await ParseChiefResponseAsync(
             chiefRaw,
+            chat.Name,
             scenario,
             findings,
             messages,
@@ -236,6 +264,7 @@ public sealed class AiCouncilService : IAiCouncilService
 
     private async Task<RepairGuide> ParseChiefResponseAsync(
         string chiefRaw,
+        string aiProviderName,
         ScanScenario scenario,
         IReadOnlyList<Finding> findings,
         IReadOnlyList<CouncilMessage> debate,
@@ -276,6 +305,7 @@ public sealed class AiCouncilService : IAiCouncilService
                     Steps = steps,
                     WebReferences = references,
                     KnowledgeReferences = kbReferences,
+                    AiProviderName = aiProviderName,
                     Sources = GuidanceSourceBuilder.Build(
                         hasAi: true,
                         hasWeb: references.Count > 0,
@@ -307,6 +337,7 @@ public sealed class AiCouncilService : IAiCouncilService
             Steps = local.Steps,
             WebReferences = local.WebReferences,
             KnowledgeReferences = local.KnowledgeReferences,
+            AiProviderName = aiProviderName,
             Sources = GuidanceSourceBuilder.Build(
                 hasAi: true,
                 hasWeb: local.WebReferences.Count > 0,

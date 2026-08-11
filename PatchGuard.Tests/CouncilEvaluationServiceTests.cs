@@ -66,6 +66,59 @@ public sealed class CouncilEvaluationServiceTests
         Assert.Equal(100, record.ConsistencyScore);
     }
 
+    [Fact]
+    public async Task SaveAsync_UsesOllamaSourceLabelWhenLocalLlmRan()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new CouncilEvaluationService(database.Factory, new CouncilEvaluator());
+
+        var guide = new RepairGuide
+        {
+            Summary = "Local model prepared recovery steps.",
+            ChiefVerdict = "Restart the affected services and rescan.",
+            AiProviderName = OllamaChatProvider.ProviderName,
+            Sources = [GuidanceSource.Local, GuidanceSource.AiGenerated, GuidanceSource.KnowledgeBase],
+            CouncilDiscussion =
+            [
+                new CouncilMessage
+                {
+                    AgentRole = "Technician",
+                    Content = "Follow the local playbook.",
+                    Headline = "Repair first",
+                    Phase = CouncilPhaseType.Analysis,
+                    Round = 1,
+                    Confidence = 74
+                }
+            ],
+            KnowledgeReferences =
+            [
+                new KnowledgeReference
+                {
+                    Title = "Windows Update services",
+                    PlaybookId = "windows-update-services",
+                    UsedFor = "Service recovery",
+                    Score = 0.9
+                }
+            ],
+            Steps =
+            [
+                new FixStep
+                {
+                    Order = 1,
+                    Title = "Restart services",
+                    Instructions = "Restart the affected Windows Update services and confirm both return to Running state.",
+                    CopyText = "services.msc"
+                }
+            ]
+        };
+
+        await service.SaveAsync(ScanScenario.AfterWindowsUpdate, guide, TimeSpan.FromMilliseconds(900));
+
+        await using var dbContext = await database.Factory.CreateDbContextAsync();
+        var record = Assert.Single(await dbContext.CouncilEvaluations.ToListAsync());
+        Assert.Equal("Ollama+KB", record.Source);
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _path;

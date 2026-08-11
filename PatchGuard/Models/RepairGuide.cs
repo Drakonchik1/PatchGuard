@@ -10,6 +10,9 @@ public sealed class RepairGuide
     public IReadOnlyList<WebReference> WebReferences { get; init; } = [];
     public IReadOnlyList<KnowledgeReference> KnowledgeReferences { get; init; } = [];
     public IReadOnlyList<GuidanceSource> Sources { get; init; } = [GuidanceSource.Local];
+
+    /// <summary>OpenAI | Ollama when AI council ran; null for rules-only.</summary>
+    public string? AiProviderName { get; init; }
 }
 
 public enum GuidanceSource

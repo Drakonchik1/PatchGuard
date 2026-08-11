@@ -2,7 +2,8 @@
 
 Windows desktop health, performance, and boost tool (WPF + .NET 10). Live hardware
 monitoring, real game FPS capture, a one-click safe optimizer, read-only diagnostics,
-and optional multi-agent AI guidance with explicit privacy controls.
+and optional multi-agent AI guidance with explicit privacy controls — including
+**local RAG** and **Ollama** (no cloud key required).
 
 ## Run
 
@@ -10,13 +11,20 @@ and optional multi-agent AI guidance with explicit privacy controls.
 dotnet run --project PatchGuard/PatchGuard.csproj
 ```
 
+With local AI (recommended for offline demos): install Ollama, pull a model, keep
+`Ollama:Enabled` true — see [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md).
+
 ## Test
 
 ```powershell
 dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj
 ```
 
-145 automated tests cover navigation, scoring, history, AI privacy, diagnostics, RAG retrieval, and UI contracts.
+Focused AI checks:
+
+```powershell
+dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj --filter "FullyQualifiedName~AiPrivacy|FullyQualifiedName~Ollama|FullyQualifiedName~ChatProvider|FullyQualifiedName~Knowledge|FullyQualifiedName~Golden"
+```
 
 ## Navigation
 
@@ -25,8 +33,6 @@ Labeled sidebar: **Dashboard**, **Diagnose**, **Live Monitor**, **Game Performan
 
 Diagnostic journey: **Choose scan** → **Scan** → **Review findings** → **Optional AI guidance**
 (with persistent step indicator and predictable back/cancel).
-
-See [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) for the full phased roadmap and [HANDOFF.md](HANDOFF.md) for developer handoff.
 
 ## Features
 
@@ -69,17 +75,28 @@ Each result includes explanation, evidence, recommended fix, action state, admin
 requirement, risk, and verification status.
 
 ### AI guidance (optional)
-Four-agent council flow (Technician, Skeptic, Researcher, Chief) when API keys are configured.
 
-**Privacy by default:** external AI/web calls require an explicit consent checkbox per request.
-Only sanitized diagnostic **categories** are sent — never titles, event text, paths, or secrets.
-Guide UI shows source labels (local / AI / web) and inspectable reference links (safe http/https only).
+Four-agent council (Technician, Skeptic, Researcher, Chief) with three backends:
 
-Fix-step links open http(s) web pages or whitelisted `ms-settings:` pages only.
+| Backend | Needs cloud key? | Needs consent checkbox? | Notes |
+|---------|------------------|-------------------------|--------|
+| **Rules** | No | No | Deterministic offline council |
+| **Ollama** (local LLM) | No | No | Same debate loop via localhost |
+| **OpenAI** + optional Tavily | Yes | Yes | Cloud; sanitized categories only |
 
-Without API keys, a **local council** runs the same flow with rule-based responses.
+**RAG:** local playbooks under `PatchGuard/KnowledgeBase/Playbooks` are retrieved before
+guidance. Guide UI shows provenance labels (local / Local LLM (Ollama) / AI / web / KB)
+and inspectable references. Fix-step links are limited to safe http(s) / `ms-settings:`.
 
-### API keys (optional)
+### Change the local model
+
+1. `ollama pull <your-model>`
+2. Set `Ollama:Model` in `appsettings` to the exact name from `ollama list`
+3. Restart the app
+
+Full steps: [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md).
+
+### API keys (optional cloud)
 
 Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Development.json` (gitignored):
 
@@ -92,14 +109,24 @@ Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Developme
   "WebSearch": {
     "Provider": "tavily",
     "ApiKey": "tvly-..."
+  },
+  "Ai": {
+    "ChatProvider": "Auto"
+  },
+  "Ollama": {
+    "Enabled": true,
+    "BaseUrl": "http://localhost:11434",
+    "Model": "qwen3.5:latest"
   }
 }
 ```
 
+`Ai:ChatProvider`: `Auto` | `OpenAI` | `Ollama` | `Rules`.
+
 ## Stack
 
 .NET 10 WPF · MVVM (CommunityToolkit.Mvvm) · EF Core SQLite · LibreHardwareMonitorLib ·
-Intel PresentMon · OpenAI HTTP · Tavily search · xUnit
+Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · xUnit
 
 ## Safety
 
@@ -108,8 +135,22 @@ Intel PresentMon · OpenAI HTTP · Tavily search · xUnit
 - Default: normal user; UAC only when you choose elevation.
 - PresentMon: Intel-signed binary required in Tools folder.
 - External links and AI payloads validated before use.
+- Local Ollama traffic stays on the machine; cloud calls still require consent.
+
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [HANDOFF.md](HANDOFF.md) | Short developer handoff |
+| [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) | Product UX phases |
+| [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md) | AI competence phases (done + planned) |
+| [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) | Install Ollama / switch models |
+| [docs/AI_EVAL_BASELINE.md](docs/AI_EVAL_BASELINE.md) | Eval metrics + RAG/LLM notes |
+| [docs/AI_EVAL_RESULTS.md](docs/AI_EVAL_RESULTS.md) | Provider comparison worksheet |
 
 ## Roadmap status
+
+### Product (UX)
 
 | Phase | Status |
 |-------|--------|
@@ -119,4 +160,16 @@ Intel PresentMon · OpenAI HTTP · Tavily search · xUnit
 | 4 — Optimization expansion | Planned |
 | 5 — Settings, history, FPS UX | Planned |
 
-Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md)
+### AI competencies
+
+| Phase | Status |
+|-------|--------|
+| 0 — Quality metrics / golden eval | Done |
+| 1 — RAG + local KB provenance | Done (n8n export still planned) |
+| 2 — Local LLM (Ollama) | Done (Settings radio still planned) |
+| 3 — Agentic graph (Semantic Kernel) | Planned |
+| 4 — Classic ML (Microsoft.ML) | Planned |
+| 5 — Azure OpenAI adapter | Planned |
+| 6 — CI regression gate | Planned |
+
+Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) · [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md)

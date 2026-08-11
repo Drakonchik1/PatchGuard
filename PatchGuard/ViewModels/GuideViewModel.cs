@@ -276,7 +276,10 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
             SourceLabels.Add(source switch
             {
                 GuidanceSource.Local => "Local diagnostic data",
-                GuidanceSource.AiGenerated => "AI-generated advice",
+                GuidanceSource.AiGenerated =>
+                    string.Equals(guide.AiProviderName, OllamaChatProvider.ProviderName, StringComparison.OrdinalIgnoreCase)
+                        ? "Local LLM (Ollama)"
+                        : "AI-generated advice",
                 GuidanceSource.WebSourced => "Web-sourced research",
                 GuidanceSource.KnowledgeBase => "Local knowledge base",
                 _ => "Source unavailable"

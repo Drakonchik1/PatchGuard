@@ -101,8 +101,12 @@ public sealed class CouncilConsistencyTests
         var openAi = new OpenAiChatClient(
             new HttpClient(new StubOpenAiHandler()),
             options);
+        var ollama = new OllamaChatProvider(
+            new HttpClient(new StubOpenAiHandler()),
+            options);
+        var resolver = new ChatProviderResolver(openAi, ollama, options);
         return new AiCouncilService(
-            openAi,
+            resolver,
             new StubWebSearch(webResults),
             new EmptyKnowledgeRetrievalService(),
             policy,

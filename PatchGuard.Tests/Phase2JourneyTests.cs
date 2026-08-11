@@ -144,6 +144,30 @@ public sealed class Phase2JourneyTests
     }
 
     [Fact]
+    public void ExistingGuideLabelsOllamaProviderDistinctly()
+    {
+        var session = new ScanSessionState
+        {
+            SelectedScenario = ScanScenario.QuickHealthCheck,
+            Guide = new RepairGuide
+            {
+                Summary = "Test",
+                ChiefVerdict = "Test",
+                AiProviderName = OllamaChatProvider.ProviderName,
+                Sources = [GuidanceSource.Local, GuidanceSource.AiGenerated]
+            }
+        };
+        var viewModel = new GuideViewModel(
+            new RecordingNavigationService(),
+            session,
+            new RecordingCouncilService());
+
+        viewModel.OnNavigatedTo();
+
+        Assert.Equal(["Local diagnostic data", "Local LLM (Ollama)"], viewModel.SourceLabels);
+    }
+
+    [Fact]
     public async Task CancellingScanReturnsToScenarioChoice()
     {
         var navigation = new RecordingNavigationService();

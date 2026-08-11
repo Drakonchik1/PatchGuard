@@ -35,7 +35,16 @@ public static class DependencyInjection
             Model = configuration[$"{AiOptions.OpenAiSection}:Model"] ?? "gpt-4o-mini",
             EmbeddingModel = configuration[$"{AiOptions.OpenAiSection}:EmbeddingModel"] ?? "text-embedding-3-small",
             WebSearchProvider = configuration[$"{AiOptions.WebSearchSection}:Provider"] ?? "tavily",
-            WebSearchApiKey = configuration[$"{AiOptions.WebSearchSection}:ApiKey"] ?? string.Empty
+            WebSearchApiKey = configuration[$"{AiOptions.WebSearchSection}:ApiKey"] ?? string.Empty,
+            ChatProvider = configuration[$"{AiOptions.AiSection}:ChatProvider"]
+                ?? ChatProviderResolver.ModeAuto,
+            OllamaEnabled = bool.TryParse(
+                configuration[$"{AiOptions.OllamaSection}:Enabled"], out var ollamaEnabled)
+                && ollamaEnabled,
+            OllamaBaseUrl = configuration[$"{AiOptions.OllamaSection}:BaseUrl"]
+                ?? "http://localhost:11434",
+            OllamaModel = configuration[$"{AiOptions.OllamaSection}:Model"]
+                ?? "qwen3.5:latest"
         };
 
         services.AddSingleton(aiOptions);
@@ -44,8 +53,15 @@ public static class DependencyInjection
             options.UseSqlite($"Data Source={dbPath}"));
 
         services.AddHttpClient<OpenAiChatClient>();
+        services.AddHttpClient<OllamaChatProvider>((_, client) =>
+        {
+            client.BaseAddress = new Uri(OllamaChatProvider.NormalizeBaseUrl(aiOptions.OllamaBaseUrl));
+            // Local models often need longer than the default 100s HttpClient timeout.
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
         services.AddHttpClient<OpenAiEmbeddingService>();
         services.AddHttpClient<TavilyWebSearchService>();
+        services.AddSingleton<ChatProviderResolver>();
 
         // Local KB must stay offline: hashing embeddings only (no OpenAI upload without consent).
         services.AddSingleton<HashingEmbeddingService>();

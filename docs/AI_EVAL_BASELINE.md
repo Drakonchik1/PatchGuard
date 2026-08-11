@@ -12,7 +12,7 @@ Each `CouncilEvaluationRecord` stores:
 
 - `EvaluatedAt`
 - `Scenario`
-- `Source` (`Local`, `AI`, `AI+Web`, `Web`)
+- `Source` (`Local`, `Local+KB`, `AI`, `AI+KB`, `AI+Web`, `Ollama`, `Ollama+KB`, `Web`, …)
 - `LatencyMs`
 - `FixStepCount`
 - `CouncilMessageCount`
@@ -59,6 +59,28 @@ Manual check after a local council on “After Windows Update” / Update servic
 
 Automated coverage: `KnowledgeRetrievalTests` (chunking, ranking, council provenance).
 
+## Local LLM (Phase 2)
+
+Same council loop (analysis → research → debate → verdict), different chat backend:
+
+| Backend | Consent | Leaves machine? |
+|---------|---------|-----------------|
+| Rules (`LocalCouncilSession`) | No | No |
+| Ollama (`OllamaChatProvider`) | No | No (localhost) |
+| OpenAI (`OpenAiChatClient`) | Yes | Yes |
+| Tavily web | Yes | Yes |
+
+Config (`appsettings.json`):
+
+- `Ai:ChatProvider` = `Auto` | `OpenAI` | `Ollama` | `Rules`
+- `Ollama:Enabled` / `BaseUrl` / `Model` (default `qwen3.5:latest`)
+
+`Auto` without consent prefers Ollama when enabled; with consent prefers OpenAI when an API key is set. HTTP failures fall back to rules. Eval `Source` uses `Ollama` / `Ollama+KB` (vs cloud `AI` / `AI+KB`). Guide UI shows **Local LLM (Ollama)** for local runs.
+
+Sanitizer still strips PII from prompts sent to any LLM, including Ollama.
+
+**Change model:** set `Ollama:Model` to any tag from `ollama list` (see [OLLAMA_SETUP.md](OLLAMA_SETUP.md)). Full AI phase plan: [AI_ROADMAP.md](AI_ROADMAP.md).
+
 ## Golden baseline
 
 The baseline is defined by 5 curated golden fixtures in
@@ -84,7 +106,5 @@ Format: `ActionabilityScore / ConsistencyScore`
 Validated with:
 
 ```powershell
-dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj --filter "FullyQualifiedName~AiPrivacyAndProvenanceTests|FullyQualifiedName~CouncilEvaluatorTests|FullyQualifiedName~CouncilEvaluationServiceTests|FullyQualifiedName~GoldenScenarioTests"
+dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj --filter "FullyQualifiedName~AiPrivacyAndProvenanceTests|FullyQualifiedName~CouncilEvaluatorTests|FullyQualifiedName~CouncilEvaluationServiceTests|FullyQualifiedName~GoldenScenarioTests|FullyQualifiedName~ChatProvider|FullyQualifiedName~Ollama|FullyQualifiedName~Knowledge"
 ```
-
-The focused baseline suite passed with 19/19 tests.

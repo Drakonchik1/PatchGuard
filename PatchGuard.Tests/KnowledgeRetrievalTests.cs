@@ -54,8 +54,10 @@ public sealed class KnowledgeRetrievalTests
     {
         var retrieval = CreateRetrievalService();
         var options = new AiOptions();
+        var openAi = new OpenAiChatClient(new HttpClient(new RejectingHandler()), options);
+        var ollama = new OllamaChatProvider(new HttpClient(new RejectingHandler()), options);
         var service = new AiCouncilService(
-            new OpenAiChatClient(new HttpClient(new RejectingHandler()), options),
+            new ChatProviderResolver(openAi, ollama, options),
             new DisabledWebSearch(),
             retrieval,
             new HealthScorePolicy(),

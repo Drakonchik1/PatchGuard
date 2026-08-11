@@ -32,7 +32,7 @@ public sealed class CouncilEvaluationService : ICouncilEvaluationService
         {
             EvaluatedAt = DateTime.UtcNow,
             Scenario = scenario.ToString(),
-            Source = BuildSourceLabel(guide.Sources),
+            Source = BuildSourceLabel(guide.Sources, guide.AiProviderName),
             LatencyMs = (int)Math.Clamp(latency.TotalMilliseconds, 0, int.MaxValue),
             FixStepCount = guide.Steps.Count,
             CouncilMessageCount = guide.CouncilDiscussion.Count,
@@ -63,17 +63,23 @@ public sealed class CouncilEvaluationService : ICouncilEvaluationService
         return records;
     }
 
-    private static string BuildSourceLabel(IReadOnlyList<GuidanceSource> sources)
+    internal static string BuildSourceLabel(
+        IReadOnlyList<GuidanceSource> sources,
+        string? aiProviderName = null)
     {
         var hasAi = sources.Contains(GuidanceSource.AiGenerated);
         var hasWeb = sources.Contains(GuidanceSource.WebSourced);
+        var hasKb = sources.Contains(GuidanceSource.KnowledgeBase);
+        var aiLabel = string.Equals(aiProviderName, OllamaChatProvider.ProviderName, StringComparison.OrdinalIgnoreCase)
+            ? "Ollama"
+            : "AI";
 
         return (hasAi, hasWeb) switch
         {
-            (true, true) => sources.Contains(GuidanceSource.KnowledgeBase) ? "AI+Web+KB" : "AI+Web",
-            (true, false) => sources.Contains(GuidanceSource.KnowledgeBase) ? "AI+KB" : "AI",
-            (false, true) => sources.Contains(GuidanceSource.KnowledgeBase) ? "Web+KB" : "Web",
-            _ => sources.Contains(GuidanceSource.KnowledgeBase) ? "Local+KB" : "Local"
+            (true, true) => hasKb ? $"{aiLabel}+Web+KB" : $"{aiLabel}+Web",
+            (true, false) => hasKb ? $"{aiLabel}+KB" : aiLabel,
+            (false, true) => hasKb ? "Web+KB" : "Web",
+            _ => hasKb ? "Local+KB" : "Local"
         };
     }
 }
