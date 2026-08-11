@@ -8,7 +8,7 @@ namespace PatchGuard.Services.Ai.Tools;
 
 /// <summary>
 /// Semantic Kernel plugins used by the Phase 3 council graph.
-/// All functions are read-only — no optimizer, registry, or service mutations.
+/// All functions are read-only and stateless (safe as singleton).
 /// </summary>
 public sealed class CouncilReadOnlyTools
 {
@@ -17,12 +17,9 @@ public sealed class CouncilReadOnlyTools
     public const string GetLocalStatusName = "get_local_status";
 
     private const int MaxOutputChars = 3500;
-    private const int MaxFindingsInStatus = 8;
 
     private readonly IKnowledgeRetrievalService _knowledge;
     private readonly IHardwareMonitorService _hardware;
-
-    private IReadOnlyList<Finding> _findings = [];
 
     public CouncilReadOnlyTools(
         IKnowledgeRetrievalService knowledge,
@@ -31,10 +28,6 @@ public sealed class CouncilReadOnlyTools
         _knowledge = knowledge;
         _hardware = hardware;
     }
-
-    /// <summary>Bind the current scan findings before invoking tools.</summary>
-    public void SetFindings(IReadOnlyList<Finding> findings) =>
-        _findings = findings ?? [];
 
     [KernelFunction(QueryKnowledgeBaseName)]
     [Description("Re-query the local PatchGuard playbook knowledge base. Does not leave the machine.")]
@@ -78,8 +71,10 @@ public sealed class CouncilReadOnlyTools
     }
 
     [KernelFunction(GetLocalStatusName)]
-    [Description("Capture a safe local hardware snapshot and summarise current scan findings. Read-only.")]
-    public string GetLocalStatus()
+    [Description("Capture aggregate local hardware metrics and summarise sanitized finding categories. Read-only. Omits device names and free-text titles.")]
+    public string GetLocalStatus(
+        [Description("JSON array of {module,severity} with already-sanitized module categories.")]
+        string findingsSummaryJson = "[]")
     {
         HardwareSnapshot snapshot;
         try
@@ -88,36 +83,30 @@ public sealed class CouncilReadOnlyTools
         }
         catch
         {
-            snapshot = new HardwareSnapshot
-            {
-                MonitorUnavailable = true,
-                StatusMessage = "Hardware capture failed."
-            };
+            snapshot = new HardwareSnapshot { MonitorUnavailable = true };
         }
 
-        var topFindings = _findings
-            .OrderByDescending(f => f.Severity)
-            .ThenBy(f => f.ModuleName, StringComparer.OrdinalIgnoreCase)
-            .Take(MaxFindingsInStatus)
-            .Select(f => new
-            {
-                module = ExternalDiagnosticSanitizer.SanitizeCategory(f.ModuleName),
-                severity = f.Severity.ToString()
-            })
-            .ToList();
+        object findingsSummary;
+        try
+        {
+            findingsSummary = JsonSerializer.Deserialize<JsonElement>(
+                string.IsNullOrWhiteSpace(findingsSummaryJson) ? "[]" : findingsSummaryJson);
+        }
+        catch
+        {
+            findingsSummary = Array.Empty<object>();
+        }
 
+        // Privacy: numeric aggregates only — no CPU/GPU product names or wall-clock identity.
         var payload = new
         {
-            capturedAt = snapshot.CapturedAt.ToString("O"),
             cpu = new
             {
-                name = Trim(snapshot.CpuName, 80),
                 loadPercent = snapshot.CpuLoadPercent,
                 tempC = snapshot.CpuTemperatureC
             },
             gpu = new
             {
-                name = Trim(snapshot.GpuName, 80),
                 loadPercent = snapshot.GpuLoadPercent,
                 tempC = snapshot.GpuTemperatureC
             },
@@ -129,10 +118,27 @@ public sealed class CouncilReadOnlyTools
             },
             sensorsLimited = snapshot.SensorsLimited,
             monitorUnavailable = snapshot.MonitorUnavailable,
-            findings = topFindings
+            findings = findingsSummary
         };
 
         return Cap(JsonSerializer.Serialize(payload));
+    }
+
+    /// <summary>Build a sanitized findings summary for <see cref="GetLocalStatus"/> (no titles/details).</summary>
+    public static string BuildFindingsSummaryJson(IReadOnlyList<Finding> findings, int max = 8)
+    {
+        var items = findings
+            .OrderByDescending(f => f.Severity)
+            .ThenBy(f => f.ModuleName, StringComparer.OrdinalIgnoreCase)
+            .Take(max)
+            .Select(f => new
+            {
+                module = ExternalDiagnosticSanitizer.SanitizeCategory(f.ModuleName),
+                severity = f.Severity.ToString()
+            })
+            .ToList();
+
+        return JsonSerializer.Serialize(items);
     }
 
     private static string Cap(string text) =>

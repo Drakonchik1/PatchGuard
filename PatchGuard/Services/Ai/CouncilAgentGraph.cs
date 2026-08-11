@@ -34,8 +34,10 @@ public sealed class CouncilAgentGraph
         var transcript = new List<(string Role, string Content)>();
         var webBlock = FormatWebResults(webResults);
         var kbBlock = KnowledgeRetrievalService.FormatHits(knowledgeHits);
-        var toolBlock = "(tools not invoked — light path)";
         var usedToolPath = NeedsToolResearch(findings);
+        var toolBlock = usedToolPath
+            ? "(tools pending — will run after analysis)"
+            : "(tools not invoked — light path)";
         IReadOnlyList<string> toolsInvoked = [];
 
         await RunDebaterPhaseAsync(
@@ -142,8 +144,8 @@ public sealed class CouncilAgentGraph
         IReadOnlyList<Finding> findings,
         CancellationToken cancellationToken)
     {
-        _toolHost.Tools.SetFindings(findings);
         var query = BuildToolQuery(findings);
+        var findingsSummary = CouncilReadOnlyTools.BuildFindingsSummaryJson(findings);
         var invoked = new List<string>();
 
         string kbJson;
@@ -169,7 +171,8 @@ public sealed class CouncilAgentGraph
         {
             statusJson = await _toolHost.InvokeAsync(
                 CouncilReadOnlyTools.GetLocalStatusName,
-                cancellationToken: cancellationToken);
+                new KernelArguments { ["findingsSummaryJson"] = findingsSummary },
+                cancellationToken);
             invoked.Add(CouncilReadOnlyTools.GetLocalStatusName);
         }
         catch (OperationCanceledException)

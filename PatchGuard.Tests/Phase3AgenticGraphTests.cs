@@ -81,6 +81,39 @@ public sealed class Phase3AgenticGraphTests
         Assert.Contains(result.Messages, m => m.Phase == CouncilPhaseType.Debate);
         Assert.Contains(result.Messages, m => m.Phase == CouncilPhaseType.Rebuttal);
         Assert.DoesNotContain("light path", result.ToolContextBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("pending", result.ToolContextBlock, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(chat.UserPrompts, p => p.Contains("tools pending", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(chat.UserPrompts.Where(p => p.Contains("PHASE: Analysis", StringComparison.Ordinal)),
+            p => p.Contains("light path", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GetLocalStatus_OmitsDeviceNamesAndFindingTitles()
+    {
+        var hardware = new TrackingHardwareMonitor();
+        var tools = new CouncilReadOnlyTools(new EmptyKnowledge(), hardware);
+        var summary = CouncilReadOnlyTools.BuildFindingsSummaryJson(
+        [
+            new Finding
+            {
+                ModuleName = "Event logs",
+                Title = @"Failure for alice on DESKTOP-PRIVATE at C:\Users\alice\app.exe",
+                Details = "secret=sk-secret-value",
+                Severity = FindingSeverity.Warning,
+                Risk = FindingRisk.Medium
+            }
+        ]);
+
+        var json = tools.GetLocalStatus(summary);
+
+        Assert.DoesNotContain("Test CPU Brand", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("alice", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DESKTOP-PRIVATE", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(@"C:\Users", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sk-secret", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Event logs", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("loadPercent", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"name\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -210,6 +243,7 @@ public sealed class Phase3AgenticGraphTests
         public string Name { get; } = name;
         public bool IsAvailable => true;
         public int CompleteCallCount { get; private set; }
+        public List<string> UserPrompts { get; } = [];
 
         public Task<string> CompleteAsync(
             string systemPrompt,
@@ -218,6 +252,7 @@ public sealed class Phase3AgenticGraphTests
             CancellationToken cancellationToken = default)
         {
             CompleteCallCount++;
+            UserPrompts.Add(userPrompt);
             if (systemPrompt.Contains("Chief Councilor", StringComparison.Ordinal))
             {
                 return Task.FromResult(chiefOverride ?? """
@@ -309,7 +344,8 @@ public sealed class Phase3AgenticGraphTests
             CaptureCalls++;
             return new HardwareSnapshot
             {
-                CpuName = "Test CPU",
+                CpuName = "Test CPU Brand",
+                GpuName = "Test GPU Brand",
                 CpuLoadPercent = 22,
                 RamLoadPercent = 40
             };

@@ -21,8 +21,6 @@ public sealed class SemanticKernelToolHost
 
     public CouncilReadOnlyTools Tools => _tools;
 
-    public Kernel Kernel => _kernel;
-
     public async Task<string> InvokeAsync(
         string functionName,
         KernelArguments? arguments = null,
