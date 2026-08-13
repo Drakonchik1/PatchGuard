@@ -144,32 +144,31 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | [HANDOFF.md](HANDOFF.md) | Short developer handoff |
 | [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) | Product UX phases |
 | [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md) | AI competence phases (done + planned) |
+| [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) | Sprint-by-sprint build plan (one chat = one sprint) |
 | [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) | Install Ollama / switch models |
 | [docs/AI_EVAL_BASELINE.md](docs/AI_EVAL_BASELINE.md) | Eval metrics + RAG/LLM notes |
 | [docs/AI_EVAL_RESULTS.md](docs/AI_EVAL_RESULTS.md) | Provider comparison worksheet |
 
 ## Roadmap status
 
-### Product (UX)
+**Execution:** [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) — 8 sprints, one Cursor chat each.
 
-| Phase | Status |
-|-------|--------|
-| 1 — UX foundation | Done |
-| 2 — Diagnostic journey | Done |
-| 3 — Alerts + guided fixes | Planned |
-| 4 — Optimization expansion | Planned |
-| 5 — Settings, history, FPS UX | Planned |
+| Sprint | Focus | Status |
+|--------|-------|--------|
+| 1 | CI + golden×10 + architecture doc | ⬜ |
+| 2 | Sensor history + alerts | ⬜ |
+| 3 | Guided fixes + alerts UI | ⬜ |
+| 4 | Classic ML (inference-only) | ⬜ |
+| 5 | AI polish (settings, trace, RAG) | ⬜ |
+| 6 | Azure + secrets | ⬜ |
+| 7 | Quality loop + portfolio | ⬜ |
+| 8 | UX optimization + settings | ⬜ |
 
-### AI competencies
+### Shipped
 
-| Phase | Status |
-|-------|--------|
-| 0 — Quality metrics / golden eval | Done |
-| 1 — RAG + local KB provenance | Done (n8n export still planned) |
-| 2 — Local LLM (Ollama) | Done (Settings radio still planned) |
-| 3 — Agentic graph (Semantic Kernel) | Done |
-| 4 — Classic ML (Microsoft.ML) | Planned |
-| 5 — Azure OpenAI adapter | Planned |
-| 6 — CI regression gate | Planned |
+| Track | Done |
+|-------|------|
+| UX Phase 1–2 | Foundation + diagnostic journey |
+| AI Phase 0–3 | Metrics, RAG, Ollama, agentic graph |
 
-Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) · [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md)
+Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) · [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md) · [HANDOFF.md](HANDOFF.md)

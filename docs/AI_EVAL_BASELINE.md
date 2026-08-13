@@ -79,12 +79,16 @@ Config (`appsettings.json`):
 
 Sanitizer still strips PII from prompts sent to any LLM, including Ollama.
 
-**Change model:** set `Ollama:Model` to any tag from `ollama list` (see [OLLAMA_SETUP.md](OLLAMA_SETUP.md)). Full AI phase plan: [AI_ROADMAP.md](AI_ROADMAP.md).
+**Change model:** set `Ollama:Model` to any tag from `ollama list` (see [OLLAMA_SETUP.md](OLLAMA_SETUP.md)). Plans: [AI_ROADMAP.md](AI_ROADMAP.md) · [SPRINT_PLAN.md](SPRINT_PLAN.md).
+
+## Build plan
+
+Sprint execution and golden expansion targets: [SPRINT_PLAN.md](SPRINT_PLAN.md) (Sprint 1 → 10 fixtures, Sprint 5 → 15–20).
 
 ## Golden baseline
 
-The baseline is defined by 5 curated golden fixtures in
-`PatchGuard.Tests/Fixtures/GoldenScenarios`.
+The baseline is defined by **5** curated golden fixtures in
+`PatchGuard.Tests/Fixtures/GoldenScenarios` (expand per sprint plan).
 
 Current verified averages:
 

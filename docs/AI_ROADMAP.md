@@ -1,77 +1,95 @@
 # AI Development Roadmap
 
-Learning / portfolio track for PatchGuard’s AI stack. Product UX phases stay in
-[UX_ROADMAP.md](UX_ROADMAP.md). This file tracks **AI competencies**.
+Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_ROADMAP.md](UX_ROADMAP.md).  
+**Execution:** [SPRINT_PLAN.md](SPRINT_PLAN.md) — one chat per sprint.
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-13
 
 ## Competence checklist
 
-| # | Competence | Phase | Deliverable | Status |
-|---|------------|-------|-------------|--------|
-| 9 | Quality metrics | 0 | Golden dataset + eval harness (`CouncilEvaluator`) | **Done** |
-| 4 + 2 + 7 | RAG / Generative AI / n8n | 1 | Local KB + retrieval + provenance; n8n reindex → JSON (external) | **Done** (RAG); n8n workflow still **planned** |
-| 5 + 2 | Local LLM / Generative AI | 2 | Ollama provider, council without cloud key | **Done** |
-| 3 + 6 | Agentic AI / LangGraph analog | 3 | Semantic Kernel conditional graph + ≥2 read-only tools | **Done** |
-| 1 | Classic ML | 4 | Microsoft.ML anomaly model + metrics in tests | Planned |
-| 8 | Azure / AWS | 5 | Azure OpenAI adapter + cloud setup doc | Planned |
-| 9 | CI regression | 6 | Golden eval gate in CI | Planned (golden tests local today) |
+| # | Competence | AI Phase | Sprint | Deliverable | Status |
+|---|------------|----------|--------|-------------|--------|
+| 9 | Quality metrics | 0 | 1, 5, 7 | Golden dataset + `CouncilEvaluator` + CI gate | **Core done** · CI Sprint 1 |
+| 4 | RAG | 1 | 5 | Local KB + retrieval + provenance | **Core done** · hybrid + 15 docs Sprint 5 |
+| 2 | Generative AI | 1–2 | — | RAG-augmented council + structured verdict | **Done** |
+| 5 | Local LLM | 2 | 5 | Ollama without cloud key | **Core done** · Settings radio Sprint 5 |
+| 3 | Agentic AI | 3 | 5 | Conditional graph + ≥2 read-only tools | **Core done** · trace + verify Sprint 5 |
+| 6 | LangGraph analog | 3 | 1, 5 | Semantic Kernel graph | **Core done** · diagram Sprint 1 |
+| 7 | n8n | 1 ext. | 7 | KB reindex → JSON export | **Planned** (optional) |
+| 1 | Classic ML | 4 | 4 | Microsoft.ML anomaly + test metrics | **Planned** |
+| 8 | Azure / AWS | 5 | 6 | Azure adapter + cloud doc + Bedrock stub | **Planned** |
+| 9 | CI regression | 6 | 1, 5, 7 | Golden eval gate in GitHub Actions | **Planned** |
 
-## Phase 0 — Metrics (done)
+## Phase 0 — Metrics (core done)
 
 - Aggregate `CouncilEvaluationRecord` (no raw prompts / PII)
 - Structural actionability + consistency scores
-- Golden fixtures under `PatchGuard.Tests/Fixtures/GoldenScenarios`
+- **5** golden fixtures under `PatchGuard.Tests/Fixtures/GoldenScenarios` (target **10** Sprint 1, **15–20** Sprint 5)
+- Verified averages: actionability **90.0%**, consistency **93.3%**
 - Docs: [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md)
 
-## Phase 1 — RAG (done)
+**Remaining (Sprint 1, 5, 7):** CI workflow, expand golden set, threshold gate, controlled experiment.
 
-- Playbooks in `PatchGuard/KnowledgeBase/Playbooks`
+## Phase 1 — RAG (core done)
+
+- **6** playbooks in `PatchGuard/KnowledgeBase/Playbooks` (target **15+** Sprint 5)
 - Chunking + offline hashing embeddings + ranked retrieval
 - Guide labels: **Local knowledge base** + inspectable references
 - Privacy: KB never uploaded for indexing
 
-### Still planned from Phase 1 scope
+**Remaining (Sprint 5, 7):** hybrid keyword + embedding retrieval; n8n reindex workflow (optional Sprint 7).
 
-- **n8n workflow:** reindex KB → export JSON artifact for CI / packaging
-
-## Phase 2 — Local LLM / Ollama (done)
+## Phase 2 — Local LLM / Ollama (core done)
 
 - `IChatCompletionProvider` + `OllamaChatProvider` + `OpenAiChatClient`
 - `ChatProviderResolver`: `Auto` | `OpenAI` | `Ollama` | `Rules`
 - Council without OpenAI key; Ollama does **not** need external consent
-- Eval labels: `Ollama` / `Ollama+KB`
-- UI: **Local LLM (Ollama)**
-- Comparison stub: [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md)
+- Eval labels: `Ollama` / `Ollama+KB`; UI: **Local LLM (Ollama)**
 
-### Still planned from Phase 2 scope
+**Remaining (Sprint 1, 5):** fill [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md); Settings UI provider radio.
 
-- Settings UI radio (Cloud / Ollama / Rules) — today config-only via `appsettings`
-
-## Phase 3 — Agentic (done)
+## Phase 3 — Agentic (core done)
 
 - `CouncilAgentGraph`: Analyze → (conditional) ToolResearch → Debate → Rebuttal → ExplainVerdict
-- Light path when no Warning/Critical findings (Analyze → Verdict)
-- Semantic Kernel Core hosts read-only `KernelFunction` plugins (`query_knowledge_base`, `get_local_status`)
-- LLM turns stay on `IChatCompletionProvider` (Ollama/OpenAI) — no SK cloud connector required
-- Richer Guide explanations: `DetailedExplanation`, per-step `WhyThisMatters` / `Evidence`
-- No learning / training mode; no write tools (optimizer stays outside the graph)
+- Light path when no Warning/Critical findings
+- Read-only SK tools: `query_knowledge_base`, `get_local_status`
+- `DetailedExplanation`, per-step `WhyThisMatters` / `Evidence`
+- No training mode; no write tools
 
-## Phase 4 — Classic ML (planned)
+**Remaining (Sprint 5):** collapsible agent trace in Guide UI; VerifySteps + 1 retry.
 
-- Microsoft.ML anomaly / health signal model
-- Metrics asserted in automated tests
+## Phase 4 — Classic ML (Sprint 4)
 
-## Phase 5 — Cloud adapter (planned)
+**Scope:** inference-only — train model **offline**, ship bundled artifact; **no** user-facing “train model” UI.
 
-- Azure OpenAI chat adapter behind the same `IChatCompletionProvider`
-- Short cloud setup doc (endpoint, deployment name, key storage)
+- Z-score baseline → Microsoft.ML Isolation Forest on sensor history
+- `AnomalyDiagnosticModule`: finding with confidence % + human explanation
+- Metrics (precision/recall/F1) in automated tests
+- `docs/ML_REPORT.md`
 
-## Phase 6 — CI regression (planned)
+**Depends on:** Sprint 2 sensor history (`ISensorHistoryService`).
 
-- Run golden + privacy + provider resolver tests in GitHub Actions
-- Fail PR if actionability/consistency averages drop below baseline
+## Phase 5 — Cloud adapter (Sprint 6)
+
+- `AzureOpenAiChatProvider` behind `IChatCompletionProvider`
+- DPAPI secret storage (not plain JSON)
+- `docs/CLOUD_ARCHITECTURE.md` + Bedrock stub (honest scope)
+
+## Phase 6 — Quality loop (Sprint 1, 5, 7)
+
+- GitHub Actions: build + golden/privacy/provider tests (Sprint 1)
+- PR fail if metrics drop >5% vs baseline (Sprint 5)
+- One controlled experiment + demo script + CV bullets (Sprint 7)
 
 ## How to choose / change the model
 
-See [OLLAMA_SETUP.md](OLLAMA_SETUP.md) for install, pull, and switching models.
+See [OLLAMA_SETUP.md](OLLAMA_SETUP.md).
+
+## Related docs
+
+| Doc | Purpose |
+|-----|---------|
+| [SPRINT_PLAN.md](SPRINT_PLAN.md) | Sprint tasks + CHAT PROMPTs |
+| [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md) | Metrics + golden baseline |
+| [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md) | Provider comparison worksheet |
+| [UX_ROADMAP.md](UX_ROADMAP.md) | Product phases (parallel track) |
