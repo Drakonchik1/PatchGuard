@@ -6,6 +6,7 @@ using PatchGuard.Models;
 using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.History;
+using PatchGuard.Services.Ml;
 using PatchGuard.Services.Platform;
 
 namespace PatchGuard.ViewModels;
@@ -13,25 +14,31 @@ namespace PatchGuard.ViewModels;
 public partial class MonitorViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private static readonly TimeSpan SnapshotInterval = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan AnomalyInterval = TimeSpan.FromSeconds(10);
 
     private readonly IHardwareMonitorService _hardware;
     private readonly IAdminElevationService _elevation;
     private readonly ISensorHistoryService _sensorHistory;
     private readonly IAlertRuleEngine _alertRules;
+    private readonly IAnomalyDetector _anomalyDetector;
     private readonly DispatcherTimer _timer;
     private DateTime _lastSnapshotUtc = DateTime.MinValue;
+    private DateTime _lastAnomalyUtc = DateTime.MinValue;
     private int _persistGeneration;
+    private int _anomalyGeneration;
 
     public MonitorViewModel(
         IHardwareMonitorService hardware,
         IAdminElevationService elevation,
         ISensorHistoryService sensorHistory,
-        IAlertRuleEngine alertRules)
+        IAlertRuleEngine alertRules,
+        IAnomalyDetector anomalyDetector)
     {
         _hardware = hardware;
         _elevation = elevation;
         _sensorHistory = sensorHistory;
         _alertRules = alertRules;
+        _anomalyDetector = anomalyDetector;
         IsElevated = elevation.IsElevated;
 
         // 2s strikes a balance between live feedback and a low CPU footprint.
@@ -89,6 +96,11 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
     [ObservableProperty] private string _alertDetailText = string.Empty;
     [ObservableProperty] private string _alertSeverityLabel = string.Empty;
 
+    [ObservableProperty] private bool _hasAnomaly;
+    [ObservableProperty] private string _anomalySummaryText = string.Empty;
+    [ObservableProperty] private string _anomalyDetailText = string.Empty;
+    [ObservableProperty] private string _anomalyConfidenceText = string.Empty;
+
     public void OnNavigatedTo()
     {
         Refresh();
@@ -145,6 +157,7 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         UpdateSensors(s.Sensors);
         ApplyAlertSummary(_alertRules.Evaluate(s));
         MaybePersistSnapshot(s);
+        MaybeRefreshAnomalies();
     }
 
     private void ApplyAlertSummary(IReadOnlyList<Alert> alerts)
@@ -163,6 +176,66 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         AlertSeverityLabel = highest.ToString();
         AlertSummaryText = $"{alerts.Count} active · {highest}";
         AlertDetailText = $"{top.Message} — {top.RecommendedAction}";
+    }
+
+    private void MaybeRefreshAnomalies()
+    {
+        var now = DateTime.UtcNow;
+        // First paint always scores; afterwards match snapshot cadence (~10s).
+        if (_lastAnomalyUtc != DateTime.MinValue && now - _lastAnomalyUtc < AnomalyInterval)
+        {
+            return;
+        }
+
+        _lastAnomalyUtc = now;
+        var generation = Interlocked.Increment(ref _anomalyGeneration);
+        _ = RefreshAnomaliesAsync(generation);
+    }
+
+    private async Task RefreshAnomaliesAsync(int generation)
+    {
+        IReadOnlyList<AnomalyHit> hits = [];
+        try
+        {
+            var history = await _sensorHistory.GetRecentAsync(take: 120);
+            if (generation != Volatile.Read(ref _anomalyGeneration))
+            {
+                return;
+            }
+
+            hits = await Task.Run(() => _anomalyDetector.Detect(history));
+        }
+        catch
+        {
+            // Anomaly scoring must not break the live monitor loop.
+        }
+
+        if (generation != Volatile.Read(ref _anomalyGeneration))
+        {
+            return;
+        }
+
+        ApplyAnomalySummary(hits);
+    }
+
+    private void ApplyAnomalySummary(IReadOnlyList<AnomalyHit> hits)
+    {
+        HasAnomaly = hits.Count > 0;
+        if (!HasAnomaly)
+        {
+            AnomalySummaryText = string.Empty;
+            AnomalyDetailText = string.Empty;
+            AnomalyConfidenceText = string.Empty;
+            return;
+        }
+
+        var top = hits
+            .OrderByDescending(h => h.ConfidencePercent)
+            .ThenByDescending(h => h.Severity)
+            .First();
+        AnomalySummaryText = $"{hits.Count} ML anomaly · {top.DetectorName}";
+        AnomalyConfidenceText = $"{top.ConfidencePercent:F0}%";
+        AnomalyDetailText = top.Explanation;
     }
 
     private void MaybePersistSnapshot(HardwareSnapshot snapshot)

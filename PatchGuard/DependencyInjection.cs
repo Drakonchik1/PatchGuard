@@ -12,6 +12,7 @@ using PatchGuard.Services.Fixes;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.Health;
 using PatchGuard.Services.History;
+using PatchGuard.Services.Ml;
 using PatchGuard.Services.Navigation;
 using PatchGuard.Services.Optimization;
 using PatchGuard.Services.Optimization.Steps;
@@ -120,6 +121,7 @@ public static class DependencyInjection
         services.AddSingleton<IDiagnosticModule, WindowsUpdateHistoryDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, EventLogDiagnosticModule>();
         services.AddSingleton<IDiagnosticModule, UpdateServicesDiagnosticModule>();
+        services.AddSingleton<IDiagnosticModule, AnomalyDiagnosticModule>();
 
         services.AddSingleton<IDiagnosticOrchestrator, DiagnosticOrchestrator>();
         services.AddSingleton<IHealthScorePolicy, HealthScorePolicy>();
@@ -132,6 +134,8 @@ public static class DependencyInjection
         services.AddSingleton<IPerformanceHistoryService, PerformanceHistoryService>();
         services.AddSingleton<ISensorHistoryService, SensorHistoryService>();
         services.AddSingleton<IAlertRuleEngine, AlertRuleEngine>();
+        services.AddSingleton<ZScoreAnomalyDetector>();
+        services.AddSingleton<IAnomalyDetector, MlNetAnomalyDetector>();
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<DiagnoseViewModel>();

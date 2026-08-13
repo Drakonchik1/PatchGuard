@@ -18,14 +18,15 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
             ScanScenario.FullSystemAudit => _allModules,
             ScanScenario.AfterWindowsUpdate => _allModules
                 .Where(m => m is not (TemperatureDiagnosticModule or GpuInfoDiagnosticModule
-                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule))
+                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule or AnomalyDiagnosticModule))
                 .ToList(),
             ScanScenario.QuickHealthCheck => _allModules
                 .Where(m => m is OsInfoDiagnosticModule or DiskSpaceDiagnosticModule or MemoryLoadDiagnosticModule)
                 .ToList(),
             ScanScenario.GamePerformanceCheck => _allModules
                 .Where(m => m is TemperatureDiagnosticModule or GpuInfoDiagnosticModule
-                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule or DiskSpaceDiagnosticModule)
+                    or CpuLoadDiagnosticModule or MemoryLoadDiagnosticModule or DiskSpaceDiagnosticModule
+                    or AnomalyDiagnosticModule)
                 .ToList(),
             _ => _allModules
         };

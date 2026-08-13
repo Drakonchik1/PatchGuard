@@ -105,6 +105,36 @@
                     </Grid>
                 </Border>
 
+                <!-- ML anomaly banner (inference-only) -->
+                <Border Style="{StaticResource CardBorder}" BorderBrush="{StaticResource WarnBrush}"
+                        Visibility="{Binding HasAnomaly, Converter={StaticResource BoolVis}}"
+                        Margin="0,0,0,12"
+                        AutomationProperties.Name="ML anomaly detection">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <TextBlock Text="ML anomaly"
+                                       FontWeight="SemiBold"
+                                       FontSize="15"
+                                       Margin="0,0,12,0"/>
+                            <Border Background="{StaticResource InsetBackgroundBrush}"
+                                    CornerRadius="4"
+                                    Padding="8,2"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding AnomalyConfidenceText}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource WarnBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding AnomalySummaryText}"
+                                   Style="{StaticResource MetricLabel}"
+                                   Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding AnomalyDetailText}"
+                                   Style="{StaticResource SubtleText}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Big tiles -->
                 <WrapPanel Orientation="Horizontal">
                     <!-- CPU -->

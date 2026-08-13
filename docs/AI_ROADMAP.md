@@ -16,7 +16,7 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 | 3 | Agentic AI | 3 | 5 | Conditional graph + ≥2 read-only tools | **Core done** · trace + verify Sprint 5 |
 | 6 | LangGraph analog | 3 | 1, 5 | Semantic Kernel graph | **Core done** · diagram Sprint 1 |
 | 7 | n8n | 1 ext. | 7 | KB reindex → JSON export | **Planned** (optional) |
-| 1 | Classic ML | 4 | 4 | Microsoft.ML anomaly + test metrics | **Planned** |
+| 1 | Classic ML | 4 | 4 | Microsoft.ML anomaly + test metrics | **Done** |
 | 8 | Azure / AWS | 5 | 6 | Azure adapter + cloud doc + Bedrock stub | **Planned** |
 | 9 | CI regression | 6 | 1, 5, 7 | Golden eval gate in GitHub Actions | **Planned** |
 
@@ -58,13 +58,13 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 
 **Remaining (Sprint 5):** collapsible agent trace in Guide UI; VerifySteps + 1 retry.
 
-## Phase 4 — Classic ML (Sprint 4)
+## Phase 4 — Classic ML (Sprint 4) ✅ Done
 
 **Scope:** inference-only — train model **offline**, ship bundled artifact; **no** user-facing “train model” UI.
 
-- Z-score baseline → Microsoft.ML Isolation Forest on sensor history
+- Z-score baseline → Isolation Forest (bundled JSON) + Microsoft.ML RandomizedPCA (`.zip`) on sensor history
 - `AnomalyDiagnosticModule`: finding with confidence % + human explanation
-- Metrics (precision/recall/F1) in automated tests
+- Metrics (precision/recall/F1) in automated tests (floors ≥ 0.80; see [ML_REPORT.md](ML_REPORT.md))
 - `docs/ML_REPORT.md`
 
 **Depends on:** Sprint 2 sensor history (`ISensorHistoryService`).
@@ -92,4 +92,5 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md).
 | [SPRINT_PLAN.md](SPRINT_PLAN.md) | Sprint tasks + CHAT PROMPTs |
 | [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md) | Metrics + golden baseline |
 | [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md) | Provider comparison worksheet |
+| [ML_REPORT.md](ML_REPORT.md) | Classic ML anomaly metrics + limitations |
 | [UX_ROADMAP.md](UX_ROADMAP.md) | Product phases (parallel track) |
