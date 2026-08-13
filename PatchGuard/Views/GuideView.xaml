@@ -199,6 +199,56 @@
                         </StackPanel>
                     </Border>
 
+                    <Border Style="{StaticResource DashboardPanel}" Margin="0,0,0,28"
+                            Visibility="{Binding HasAgentTrace, Converter={StaticResource BoolVis}}">
+                        <Expander IsExpanded="{Binding IsTraceExpanded}"
+                                  Foreground="{StaticResource TextPrimaryBrush}"
+                                  BorderThickness="0"
+                                  Background="Transparent">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Agent trace"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding TraceSummary}"
+                                               Margin="14,0,0,0"
+                                               Style="{StaticResource SubtleText}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Margin="0,14,0,0">
+                                <TextBlock Text="Nodes visited" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8"/>
+                                <ItemsControl ItemsSource="{Binding TraceNodes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource SubtleText}" Margin="0,0,0,4"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Tools called" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{StaticResource AccentBrush}" Margin="0,12,0,8"/>
+                                <ItemsControl ItemsSource="{Binding TraceTools}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource SubtleText}" Margin="0,0,0,4"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Timing" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{StaticResource AccentBrush}" Margin="0,12,0,8"/>
+                                <ItemsControl ItemsSource="{Binding TraceTimings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource SubtleText}" Margin="0,0,0,4"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Expander>
+                    </Border>
+
                     <Border Style="{StaticResource DashboardPanel}" Margin="0,0,0,28">
                         <StackPanel>
                             <TextBlock Text="Council transcript" Style="{StaticResource SectionHeader}"/>

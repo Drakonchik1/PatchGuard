@@ -190,6 +190,7 @@ public sealed class AiCouncilService : IAiCouncilService
             webResults,
             searchBundles,
             knowledgeHits,
+            graphResult.Trace,
             cancellationToken);
         reporter.EmitChief(guide.ChiefVerdict);
         return guide;
@@ -204,6 +205,7 @@ public sealed class AiCouncilService : IAiCouncilService
         IReadOnlyList<WebSearchResult> webResults,
         IReadOnlyList<(string Query, IReadOnlyList<WebSearchResult> Results)> searchBundles,
         IReadOnlyList<KnowledgeHit> knowledgeHits,
+        CouncilTrace? trace,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -223,9 +225,18 @@ public sealed class AiCouncilService : IAiCouncilService
                         Instructions = s.Instructions ?? string.Empty,
                         WhyThisMatters = NullIfWhiteSpace(s.Why),
                         Evidence = NullIfWhiteSpace(s.Evidence),
-                        LinkUrl = ExternalUrlPolicy.TryNormalize(s.LinkUrl, out var link)
-                            ? link!.AbsoluteUri
-                            : null,
+                        LinkUrl = NormalizeStepLink(s.LinkUrl),
+                        CopyText = s.CopyText
+                    })
+                    .Where(FixStepVerifier.IsSafe)
+                    .Select((s, i) => new FixStep
+                    {
+                        Order = i + 1,
+                        Title = s.Title,
+                        Instructions = s.Instructions,
+                        WhyThisMatters = s.WhyThisMatters,
+                        Evidence = s.Evidence,
+                        LinkUrl = s.LinkUrl,
                         CopyText = s.CopyText
                     })
                     .ToList() ?? [];
@@ -242,6 +253,7 @@ public sealed class AiCouncilService : IAiCouncilService
                     WebReferences = references,
                     KnowledgeReferences = kbReferences,
                     AiProviderName = aiProviderName,
+                    Trace = trace,
                     Sources = GuidanceSourceBuilder.Build(
                         hasAi: true,
                         hasWeb: references.Count > 0,
@@ -275,11 +287,22 @@ public sealed class AiCouncilService : IAiCouncilService
             WebReferences = local.WebReferences,
             KnowledgeReferences = local.KnowledgeReferences,
             AiProviderName = aiProviderName,
+            Trace = trace,
             Sources = GuidanceSourceBuilder.Build(
                 hasAi: true,
                 hasWeb: local.WebReferences.Count > 0,
                 hasKnowledgeBase: local.KnowledgeReferences.Count > 0)
         };
+    }
+
+    private static string? NormalizeStepLink(string? linkUrl)
+    {
+        if (LaunchUriPolicy.TryNormalize(linkUrl, out var launchUri) && launchUri is not null)
+        {
+            return launchUri;
+        }
+
+        return null;
     }
 
     private static string? NullIfWhiteSpace(string? value) =>

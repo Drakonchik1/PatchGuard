@@ -18,6 +18,7 @@ using PatchGuard.Services.Optimization;
 using PatchGuard.Services.Optimization.Steps;
 using PatchGuard.Services.Performance;
 using PatchGuard.Services.Platform;
+using PatchGuard.Services.Settings;
 using PatchGuard.ViewModels;
 
 namespace PatchGuard;
@@ -65,6 +66,13 @@ public static class DependencyInjection
                 ? temperature
                 : 0.35
         };
+
+        services.AddSingleton<IUserSettingsStore, JsonUserSettingsStore>();
+        var userSettings = new JsonUserSettingsStore().Load();
+        if (!string.IsNullOrWhiteSpace(userSettings.ChatProvider))
+        {
+            aiOptions.ChatProvider = userSettings.ChatProvider.Trim();
+        }
 
         services.AddSingleton(aiOptions);
 

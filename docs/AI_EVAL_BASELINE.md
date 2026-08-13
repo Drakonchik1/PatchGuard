@@ -87,15 +87,18 @@ Sprint execution and golden expansion targets: [SPRINT_PLAN.md](SPRINT_PLAN.md) 
 
 ## Golden baseline
 
-The baseline is defined by **10** curated golden fixtures in
+The baseline is defined by **15** curated golden fixtures in
 `PatchGuard.Tests/Fixtures/GoldenScenarios`.
 
 Current verified averages:
 
-- Average actionability: `91.7%`
-- Average consistency: `95.0%`
+- Average actionability: `94.4%`
+- Average consistency: `96.7%`
 
-Per-fixture expected scores:
+CI fails if live averages drop **more than 5%** below these baselines
+(`GoldenAveragesMustNotDropMoreThanFivePercentVsBaseline`).
+
+Per-fixture expected scores (original 10 + Sprint 5):
 
 - `after-update-service-recovery`: `100.0 / 100.0`
 - `ai-augmented-health-check`: `100.0 / 100.0`
@@ -107,6 +110,11 @@ Per-fixture expected scores:
 - `web-only-provenance-drift`: `83.3 / 83.3`
 - `manual-verification-only`: `66.7 / 100.0`
 - `short-instruction-regression`: `66.7 / 100.0`
+- `memory-pressure-working-set`: `100.0 / 100.0`
+- `startup-bloat-cleanup`: `100.0 / 100.0`
+- `pending-reboot-finish`: `100.0 / 100.0`
+- `network-dns-flush`: `100.0 / 100.0`
+- `gpu-thermal-game-session`: `100.0 / 100.0`
 
 Format: `ActionabilityScore / ConsistencyScore`
 

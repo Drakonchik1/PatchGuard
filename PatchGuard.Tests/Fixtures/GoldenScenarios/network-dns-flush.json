@@ -1,0 +1,44 @@
+﻿{
+  "name": "network-dns-flush",
+  "scenario": "QuickHealthCheck",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council treated name-resolution failures as a local DNS cache issue before deeper adapter resets.",
+    "chiefVerdict": "Flush DNS, toggle connectivity once, then retest the failing hostname.",
+    "sources": [ "Local", "KnowledgeBase" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Technician",
+        "content": "KB/network-connectivity and dns-flush both prefer cache flush over full stack reset.",
+        "headline": "Flush first",
+        "phase": "Analysis",
+        "round": 1,
+        "confidence": 79
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Flush DNS cache",
+        "instructions": "Run the PatchGuard Optimize Flush DNS cache step, then retry the site or update download that failed.",
+        "copyText": "Flush DNS cache"
+      },
+      {
+        "order": 2,
+        "title": "Toggle network briefly",
+        "instructions": "Toggle airplane mode or unplug and reconnect Ethernet once, then confirm the hostname resolves again.",
+        "copyText": "ms-settings:network"
+      }
+    ],
+    "webReferences": [],
+    "knowledgeReferences": [
+      {
+        "title": "Network connectivity basics",
+        "playbookId": "network-connectivity",
+        "usedFor": "Name resolution failures",
+        "score": 0.8
+      }
+    ]
+  }
+}

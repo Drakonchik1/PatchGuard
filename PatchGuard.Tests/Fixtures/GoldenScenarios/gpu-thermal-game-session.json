@@ -1,0 +1,44 @@
+﻿{
+  "name": "gpu-thermal-game-session",
+  "scenario": "FullSystemAudit",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council linked GPU warnings to thermal pressure during sustained load rather than a failed driver install.",
+    "chiefVerdict": "Clear intake vents, use a balanced GPU power profile, then re-check Monitor temps after a short game session.",
+    "sources": [ "Local", "KnowledgeBase" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Researcher",
+        "content": "KB/gpu-thermal-throttling warns against voltage unlocks as a first response.",
+        "headline": "Cool before tune",
+        "phase": "Research",
+        "round": 1,
+        "confidence": 81
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Clear GPU vents",
+        "instructions": "Power off, clear dust from GPU and case intake vents, then restore airflow before the next gaming session.",
+        "copyText": "Clean vents"
+      },
+      {
+        "order": 2,
+        "title": "Recheck Monitor temps",
+        "instructions": "Open PatchGuard Live Monitor, play for five minutes, and confirm GPU temperature stays below the warning threshold.",
+        "copyText": "Open Live Monitor"
+      }
+    ],
+    "webReferences": [],
+    "knowledgeReferences": [
+      {
+        "title": "GPU thermal and throttling checks",
+        "playbookId": "gpu-thermal-throttling",
+        "usedFor": "GPU temperature warning during games",
+        "score": 0.86
+      }
+    ]
+  }
+}

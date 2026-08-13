@@ -90,7 +90,7 @@ public sealed class CouncilEvaluator
 
         var linksAreSafe = guide.Steps
             .Where(step => !string.IsNullOrWhiteSpace(step.LinkUrl))
-            .All(step => ExternalUrlPolicy.TryNormalize(step.LinkUrl!, out _));
+            .All(step => LaunchUriPolicy.TryNormalize(step.LinkUrl!, out _));
         var referencesAreSafe = guide.WebReferences
             .All(reference => ExternalUrlPolicy.TryNormalize(reference.Url, out _));
 

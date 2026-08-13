@@ -50,6 +50,33 @@ public sealed class KnowledgeRetrievalTests
     }
 
     [Fact]
+    public async Task HybridRetrieval_BoostsExactKeywordPlaybook()
+    {
+        var service = CreateRetrievalService();
+        var hits = await service.RetrieveAsync(
+            "wuauserv BITS Background Intelligent Transfer Service restart order",
+            topK: 5);
+
+        Assert.NotEmpty(hits);
+        var top = hits[0];
+        Assert.Contains("windows-update", top.Chunk.PlaybookId, StringComparison.OrdinalIgnoreCase);
+
+        var tokens = KnowledgeRetrievalService.Tokenize("wuauserv BITS restart");
+        var keyword = KnowledgeRetrievalService.KeywordOverlap(tokens, top.Chunk);
+        Assert.True(keyword > 0, "Expected keyword overlap against the update playbook.");
+        Assert.InRange(KnowledgeRetrievalService.HybridScore(0.5, 0.5), 0.49, 0.51);
+        Assert.True(top.Score > 0);
+    }
+
+    [Fact]
+    public void PlaybookCorpus_HasAtLeastFifteenDocuments()
+    {
+        var playbooks = ResolvePlaybooksDirectory();
+        var count = Directory.GetFiles(playbooks, "*.md").Length;
+        Assert.True(count >= 15, $"Expected ≥15 playbooks, found {count}.");
+    }
+
+    [Fact]
     public async Task CouncilWithoutExternalConsentStillCitesLocalKnowledgeBase()
     {
         var retrieval = CreateRetrievalService();

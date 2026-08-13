@@ -9,54 +9,52 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 
 | # | Competence | AI Phase | Sprint | Deliverable | Status |
 |---|------------|----------|--------|-------------|--------|
-| 9 | Quality metrics | 0 | 1, 5, 7 | Golden dataset + `CouncilEvaluator` + CI gate | **Core done** · CI Sprint 1 |
-| 4 | RAG | 1 | 5 | Local KB + retrieval + provenance | **Core done** · hybrid + 15 docs Sprint 5 |
+| 9 | Quality metrics | 0 | 1, 5, 7 | Golden dataset + `CouncilEvaluator` + CI gate | **Done** · threshold Sprint 5 |
+| 4 | RAG | 1 | 5 | Local KB + retrieval + provenance | **Done** · hybrid + 16 docs |
 | 2 | Generative AI | 1–2 | — | RAG-augmented council + structured verdict | **Done** |
-| 5 | Local LLM | 2 | 5 | Ollama without cloud key | **Core done** · Settings radio Sprint 5 |
-| 3 | Agentic AI | 3 | 5 | Conditional graph + ≥2 read-only tools | **Core done** · trace + verify Sprint 5 |
-| 6 | LangGraph analog | 3 | 1, 5 | Semantic Kernel graph | **Core done** · diagram Sprint 1 |
+| 5 | Local LLM | 2 | 5 | Ollama without cloud key | **Done** · Settings radio |
+| 3 | Agentic AI | 3 | 5 | Conditional graph + ≥2 read-only tools | **Done** · trace + verify |
+| 6 | LangGraph analog | 3 | 1, 5 | Semantic Kernel graph | **Done** |
 | 7 | n8n | 1 ext. | 7 | KB reindex → JSON export | **Planned** (optional) |
 | 1 | Classic ML | 4 | 4 | Microsoft.ML anomaly + test metrics | **Done** |
 | 8 | Azure / AWS | 5 | 6 | Azure adapter + cloud doc + Bedrock stub | **Planned** |
-| 9 | CI regression | 6 | 1, 5, 7 | Golden eval gate in GitHub Actions | **Planned** |
+| 9 | CI regression | 6 | 1, 5, 7 | Golden eval gate in GitHub Actions | **Done** · >5% gate Sprint 5 |
 
 ## Phase 0 — Metrics (core done)
 
 - Aggregate `CouncilEvaluationRecord` (no raw prompts / PII)
 - Structural actionability + consistency scores
-- **5** golden fixtures under `PatchGuard.Tests/Fixtures/GoldenScenarios` (target **10** Sprint 1, **15–20** Sprint 5)
-- Verified averages: actionability **90.0%**, consistency **93.3%**
+- **15** golden fixtures under `PatchGuard.Tests/Fixtures/GoldenScenarios`
+- Verified averages: actionability **94.4%**, consistency **96.7%**
 - Docs: [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md)
 
-**Remaining (Sprint 1, 5, 7):** CI workflow, expand golden set, threshold gate, controlled experiment.
+**Remaining (Sprint 7):** controlled experiment + demo script.
 
-## Phase 1 — RAG (core done)
+## Phase 1 — RAG ✅ Done (Sprint 5 polish)
 
-- **6** playbooks in `PatchGuard/KnowledgeBase/Playbooks` (target **15+** Sprint 5)
-- Chunking + offline hashing embeddings + ranked retrieval
+- **16** playbooks in `PatchGuard/KnowledgeBase/Playbooks`
+- Chunking + offline hashing embeddings + **hybrid** keyword+embedding retrieval
 - Guide labels: **Local knowledge base** + inspectable references
 - Privacy: KB never uploaded for indexing
 
-**Remaining (Sprint 5, 7):** hybrid keyword + embedding retrieval; n8n reindex workflow (optional Sprint 7).
+**Remaining (Sprint 7):** n8n reindex workflow (optional).
 
-## Phase 2 — Local LLM / Ollama (core done)
+## Phase 2 — Local LLM / Ollama ✅ Done (Sprint 5 polish)
 
 - `IChatCompletionProvider` + `OllamaChatProvider` + `OpenAiChatClient`
 - `ChatProviderResolver`: `Auto` | `OpenAI` | `Ollama` | `Rules`
+- Settings UI radio: Cloud / Ollama / Rules (persisted)
 - Council without OpenAI key; Ollama does **not** need external consent
 - Eval labels: `Ollama` / `Ollama+KB`; UI: **Local LLM (Ollama)**
 
-**Remaining (Sprint 1, 5):** fill [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md); Settings UI provider radio.
+## Phase 3 — Agentic ✅ Done (Sprint 5 polish)
 
-## Phase 3 — Agentic (core done)
-
-- `CouncilAgentGraph`: Analyze → (conditional) ToolResearch → Debate → Rebuttal → ExplainVerdict
+- `CouncilAgentGraph`: Analyze → (conditional) ToolResearch → Debate → Rebuttal → ExplainVerdict → VerifySteps
 - Light path when no Warning/Critical findings
 - Read-only SK tools: `query_knowledge_base`, `get_local_status`
 - `DetailedExplanation`, per-step `WhyThisMatters` / `Evidence`
+- Collapsible `CouncilTrace` in Guide; unsafe steps rejected with max 1 retry
 - No training mode; no write tools
-
-**Remaining (Sprint 5):** collapsible agent trace in Guide UI; VerifySteps + 1 retry.
 
 ## Phase 4 — Classic ML (Sprint 4) ✅ Done
 
@@ -77,8 +75,8 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 
 ## Phase 6 — Quality loop (Sprint 1, 5, 7)
 
-- GitHub Actions: build + golden/privacy/provider tests (Sprint 1)
-- PR fail if metrics drop >5% vs baseline (Sprint 5)
+- GitHub Actions: build + golden/privacy/provider tests (Sprint 1) ✅
+- PR fail if metrics drop >5% vs baseline (Sprint 5) ✅
 - One controlled experiment + demo script + CV bullets (Sprint 7)
 
 ## How to choose / change the model

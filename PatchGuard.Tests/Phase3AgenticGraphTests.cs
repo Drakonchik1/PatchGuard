@@ -217,6 +217,82 @@ public sealed class Phase3AgenticGraphTests
         Assert.Equal("Scan reported low disk space on C:.", step.Evidence);
     }
 
+    [Fact]
+    public async Task VerifySteps_RetriesOnceWhenChiefReturnsUnsafePlan()
+    {
+        var unsafeJson = """
+            {
+              "summary": "Unsafe plan.",
+              "verdict": "Run privileged repair.",
+              "detailedExplanation": "Would elevate.",
+              "steps": [
+                {
+                  "title": "Run DISM",
+                  "instructions": "Open elevated PowerShell and run DISM /Online /Cleanup-Image /RestoreHealth now.",
+                  "why": "Repair image",
+                  "evidence": "Update failed",
+                  "linkUrl": null,
+                  "copyText": null
+                }
+              ]
+            }
+            """;
+        var safeJson = """
+            {
+              "summary": "Safe plan.",
+              "verdict": "Use Storage Sense only.",
+              "detailedExplanation": "Manual Settings path avoids elevation.",
+              "steps": [
+                {
+                  "title": "Open Storage Sense",
+                  "instructions": "Open Storage Sense and remove temporary files from the system volume only.",
+                  "why": "Free staging space",
+                  "evidence": "Low disk warning",
+                  "linkUrl": "ms-settings:storagesense",
+                  "copyText": null
+                }
+              ]
+            }
+            """;
+
+        var chat = new ScriptedChatProvider("Ollama", chiefSequence: [unsafeJson, safeJson]);
+        var graph = CouncilTestFactory.CreateAgentGraph();
+        var reporter = new CouncilProgressReporter(null);
+
+        var result = await graph.RunAsync(
+            chat,
+            ScanScenario.QuickHealthCheck,
+            [WarningFinding("Low disk space on C:")],
+            "context",
+            [],
+            [],
+            reporter,
+            CancellationToken.None);
+
+        Assert.NotNull(result.Trace);
+        Assert.Equal(1, result.Trace!.VerifyRetryCount);
+        Assert.Contains("VerifySteps", result.Trace.NodesVisited);
+        Assert.Contains("ExplainVerdict", result.Trace.NodesVisited);
+        Assert.Contains("ToolResearch", result.Trace.NodesVisited);
+        Assert.Equal(2, chat.ChiefCallCount);
+        Assert.Contains("VERIFY FAILED", chat.UserPrompts.Last(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DISM", result.ChiefRaw, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("storagesense", result.ChiefRaw, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Trace.RejectedStepReasons);
+    }
+
+    [Fact]
+    public void FixStepVerifier_RejectsPrivilegedCommandsAndBadLinks()
+    {
+        var reasons = FixStepVerifier.DescribeUnsafe(
+            "Repair image",
+            "Run DISM /Online /Cleanup-Image /RestoreHealth",
+            "javascript:alert(1)").ToList();
+
+        Assert.Contains(reasons, r => r.Contains("dism", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(reasons, r => r.Contains("unsafe linkUrl", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static Finding InfoFinding(string title) => new()
     {
         ModuleName = "Operating system",
@@ -238,11 +314,15 @@ public sealed class Phase3AgenticGraphTests
         ActionState = FindingActionState.Recommended
     };
 
-    private sealed class ScriptedChatProvider(string name, string? chiefOverride = null) : IChatCompletionProvider
+    private sealed class ScriptedChatProvider(string name, string? chiefOverride = null, IReadOnlyList<string>? chiefSequence = null)
+        : IChatCompletionProvider
     {
+        private int _chiefIndex;
+
         public string Name { get; } = name;
         public bool IsAvailable => true;
         public int CompleteCallCount { get; private set; }
+        public int ChiefCallCount { get; private set; }
         public List<string> UserPrompts { get; } = [];
 
         public Task<string> CompleteAsync(
@@ -255,6 +335,14 @@ public sealed class Phase3AgenticGraphTests
             UserPrompts.Add(userPrompt);
             if (systemPrompt.Contains("Chief Councilor", StringComparison.Ordinal))
             {
+                ChiefCallCount++;
+                if (chiefSequence is { Count: > 0 })
+                {
+                    var index = Math.Min(_chiefIndex, chiefSequence.Count - 1);
+                    _chiefIndex++;
+                    return Task.FromResult(chiefSequence[index]);
+                }
+
                 return Task.FromResult(chiefOverride ?? """
                     {"summary":"Baseline only.","verdict":"No urgent work.","detailedExplanation":"Clean scan.","steps":[{"title":"Save baseline","instructions":"Record build number from Settings About page.","why":"Compare after next patch.","evidence":"Info-only findings."}]}
                     """);

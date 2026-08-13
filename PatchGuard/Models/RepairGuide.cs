@@ -17,6 +17,9 @@ public sealed class RepairGuide
 
     /// <summary>OpenAI | Ollama when AI council ran; null for rules-only.</summary>
     public string? AiProviderName { get; init; }
+
+    /// <summary>Agent-graph provenance (nodes, tools, verify retries) when LLM council ran.</summary>
+    public CouncilTrace? Trace { get; init; }
 }
 
 public enum GuidanceSource

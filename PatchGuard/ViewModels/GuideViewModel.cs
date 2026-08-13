@@ -71,6 +71,9 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     public ObservableCollection<KnowledgeReference> KnowledgeReferences { get; } = [];
     public ObservableCollection<ScanMetric> ScanMetrics { get; } = [];
     public ObservableCollection<string> SourceLabels { get; } = [];
+    public ObservableCollection<string> TraceNodes { get; } = [];
+    public ObservableCollection<string> TraceTools { get; } = [];
+    public ObservableCollection<string> TraceTimings { get; } = [];
 
     [ObservableProperty]
     private string _summary = string.Empty;
@@ -101,6 +104,15 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
 
     [ObservableProperty]
     private string? _fixStatusMessage;
+
+    [ObservableProperty]
+    private bool _hasAgentTrace;
+
+    [ObservableProperty]
+    private string _traceSummary = string.Empty;
+
+    [ObservableProperty]
+    private bool _isTraceExpanded;
 
     public void OnNavigatedTo()
     {
@@ -195,12 +207,18 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         KnowledgeReferences.Clear();
         ScanMetrics.Clear();
         SourceLabels.Clear();
+        TraceNodes.Clear();
+        TraceTools.Clear();
+        TraceTimings.Clear();
         ChiefVerdict = string.Empty;
         DetailedExplanation = string.Empty;
         Summary = string.Empty;
         HealthScore = 0;
         ErrorMessage = null;
         FixStatusMessage = null;
+        HasAgentTrace = false;
+        TraceSummary = string.Empty;
+        IsTraceExpanded = false;
 
         foreach (var step in PhaseSteps)
         {
@@ -348,6 +366,44 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         {
             KnowledgeReferences.Add(reference);
         }
+
+        ApplyTrace(guide.Trace);
+    }
+
+    private void ApplyTrace(CouncilTrace? trace)
+    {
+        TraceNodes.Clear();
+        TraceTools.Clear();
+        TraceTimings.Clear();
+
+        if (trace is null)
+        {
+            HasAgentTrace = false;
+            TraceSummary = string.Empty;
+            return;
+        }
+
+        HasAgentTrace = true;
+        foreach (var node in trace.NodesVisited)
+        {
+            TraceNodes.Add(node);
+        }
+
+        foreach (var tool in trace.ToolsCalled)
+        {
+            TraceTools.Add(tool);
+        }
+
+        foreach (var timing in trace.NodeTimings)
+        {
+            TraceTimings.Add($"{timing.Node}: {timing.DurationMs} ms");
+        }
+
+        var retry = trace.VerifyRetryCount > 0
+            ? $", verify retry ×{trace.VerifyRetryCount}"
+            : string.Empty;
+        TraceSummary =
+            $"{trace.NodesVisited.Count} nodes · {trace.ToolsCalled.Count} tools · {trace.TotalDurationMs} ms{retry}";
     }
 
     [RelayCommand(CanExecute = nameof(CanRunFix))]

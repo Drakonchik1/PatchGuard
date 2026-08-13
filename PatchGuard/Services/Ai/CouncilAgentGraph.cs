@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Text.Json;
 using Microsoft.SemanticKernel;
 using PatchGuard.Models;
 using PatchGuard.Services.Ai.Tools;
@@ -7,6 +11,7 @@ namespace PatchGuard.Services.Ai;
 /// <summary>
 /// Conditional council graph (LangGraph analog): Analyze → optional ToolResearch → Debate/Rebuttal → Verdict.
 /// Light path skips debate when there are no Warning/Critical findings.
+/// After the chief verdict, <see cref="FixStepVerifier"/> rejects unsafe steps with at most one retry.
 /// </summary>
 public sealed class CouncilAgentGraph
 {
@@ -30,6 +35,9 @@ public sealed class CouncilAgentGraph
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
+        var totalSw = Stopwatch.StartNew();
+        var nodesVisited = new List<string>();
+        var timings = new List<CouncilTraceNodeTiming>();
         var messages = new List<CouncilMessage>();
         var transcript = new List<(string Role, string Content)>();
         var webBlock = FormatWebResults(webResults);
@@ -40,75 +48,195 @@ public sealed class CouncilAgentGraph
             : "(tools not invoked — light path)";
         IReadOnlyList<string> toolsInvoked = [];
 
-        await RunDebaterPhaseAsync(
-            chat,
-            CouncilPhaseType.Analysis,
-            "Council analyzing scan…",
-            1,
-            context,
-            kbBlock,
-            webBlock,
-            toolBlock,
-            messages,
-            transcript,
-            reporter,
-            cancellationToken);
+        await TimedNodeAsync("Analyze", nodesVisited, timings, async () =>
+        {
+            await RunDebaterPhaseAsync(
+                chat,
+                CouncilPhaseType.Analysis,
+                "Council analyzing scan…",
+                1,
+                context,
+                kbBlock,
+                webBlock,
+                toolBlock,
+                messages,
+                transcript,
+                reporter,
+                cancellationToken);
+        });
 
         if (usedToolPath)
         {
-            reporter.SetPhase(CouncilPhaseType.Research, "Invoking read-only council tools…");
-            var toolResult = await InvokeReadOnlyToolsAsync(findings, cancellationToken);
-            toolBlock = toolResult.Block;
-            toolsInvoked = toolResult.InvokedNames;
+            await TimedNodeAsync("ToolResearch", nodesVisited, timings, async () =>
+            {
+                reporter.SetPhase(CouncilPhaseType.Research, "Invoking read-only council tools…");
+                var toolResult = await InvokeReadOnlyToolsAsync(findings, cancellationToken);
+                toolBlock = toolResult.Block;
+                toolsInvoked = toolResult.InvokedNames;
+            });
 
-            await RunDebaterPhaseAsync(
-                chat,
-                CouncilPhaseType.Research,
-                "Council processing tool research…",
-                1,
-                context,
-                kbBlock,
-                webBlock,
-                toolBlock,
-                messages,
-                transcript,
-                reporter,
-                cancellationToken);
+            await TimedNodeAsync("Research", nodesVisited, timings, async () =>
+            {
+                await RunDebaterPhaseAsync(
+                    chat,
+                    CouncilPhaseType.Research,
+                    "Council processing tool research…",
+                    1,
+                    context,
+                    kbBlock,
+                    webBlock,
+                    toolBlock,
+                    messages,
+                    transcript,
+                    reporter,
+                    cancellationToken);
+            });
 
-            await RunDebaterPhaseAsync(
-                chat,
-                CouncilPhaseType.Debate,
-                "Debate round 1…",
-                1,
-                context,
-                kbBlock,
-                webBlock,
-                toolBlock,
-                messages,
-                transcript,
-                reporter,
-                cancellationToken);
+            await TimedNodeAsync("Debate", nodesVisited, timings, async () =>
+            {
+                await RunDebaterPhaseAsync(
+                    chat,
+                    CouncilPhaseType.Debate,
+                    "Debate round 1…",
+                    1,
+                    context,
+                    kbBlock,
+                    webBlock,
+                    toolBlock,
+                    messages,
+                    transcript,
+                    reporter,
+                    cancellationToken);
+            });
 
-            await RunDebaterPhaseAsync(
-                chat,
-                CouncilPhaseType.Rebuttal,
-                "Debate round 2 — final positions…",
-                2,
-                context,
-                kbBlock,
-                webBlock,
-                toolBlock,
-                messages,
-                transcript,
-                reporter,
-                cancellationToken);
+            await TimedNodeAsync("Rebuttal", nodesVisited, timings, async () =>
+            {
+                await RunDebaterPhaseAsync(
+                    chat,
+                    CouncilPhaseType.Rebuttal,
+                    "Debate round 2 — final positions…",
+                    2,
+                    context,
+                    kbBlock,
+                    webBlock,
+                    toolBlock,
+                    messages,
+                    transcript,
+                    reporter,
+                    cancellationToken);
+            });
         }
 
         reporter.SetPhase(CouncilPhaseType.Verdict, "Chief Councilor deciding…");
         reporter.DeactivateAgents();
 
         var debateText = FormatTranscript(messages);
-        var chiefRaw = await chat.CompleteAsync(
+        string chiefRaw = string.Empty;
+        var verifyRetryCount = 0;
+        IReadOnlyList<string> rejectedReasons = [];
+
+        await TimedNodeAsync("ExplainVerdict", nodesVisited, timings, async () =>
+        {
+            chiefRaw = await CompleteChiefAsync(
+                chat,
+                scenario,
+                context,
+                debateText,
+                kbBlock,
+                toolBlock,
+                webBlock,
+                rejectionFeedback: null,
+                cancellationToken);
+
+            var verification = FixStepVerifier.VerifyChiefJson(chiefRaw);
+            if (!verification.IsValid)
+            {
+                verifyRetryCount = 1;
+                rejectedReasons = verification.RejectionReasons;
+                nodesVisited.Add("VerifySteps");
+                reporter.SetPhase(CouncilPhaseType.Verdict, "Verifying steps — retrying unsafe plan…");
+
+                chiefRaw = await CompleteChiefAsync(
+                    chat,
+                    scenario,
+                    context,
+                    debateText,
+                    kbBlock,
+                    toolBlock,
+                    webBlock,
+                    rejectionFeedback: verification.RejectionReasons,
+                    cancellationToken);
+
+                var second = FixStepVerifier.VerifyChiefJson(chiefRaw);
+                if (!second.IsValid)
+                {
+                    rejectedReasons = second.RejectionReasons;
+                    chiefRaw = StripUnsafeSteps(chiefRaw);
+                }
+                else
+                {
+                    rejectedReasons = [];
+                }
+            }
+        });
+
+        totalSw.Stop();
+        var trace = new CouncilTrace
+        {
+            NodesVisited = nodesVisited,
+            ToolsCalled = toolsInvoked,
+            NodeTimings = timings,
+            VerifyRetryCount = verifyRetryCount,
+            RejectedStepReasons = rejectedReasons,
+            TotalDurationMs = totalSw.ElapsedMilliseconds
+        };
+
+        return new CouncilGraphResult
+        {
+            Messages = messages,
+            ChiefRaw = chiefRaw,
+            ToolContextBlock = toolBlock,
+            UsedToolPath = usedToolPath,
+            ToolsInvoked = toolsInvoked,
+            Trace = trace
+        };
+    }
+
+    private static async Task TimedNodeAsync(
+        string node,
+        List<string> nodesVisited,
+        List<CouncilTraceNodeTiming> timings,
+        Func<Task> action)
+    {
+        nodesVisited.Add(node);
+        var sw = Stopwatch.StartNew();
+        await action();
+        sw.Stop();
+        timings.Add(new CouncilTraceNodeTiming { Node = node, DurationMs = sw.ElapsedMilliseconds });
+    }
+
+    private static Task<string> CompleteChiefAsync(
+        IChatCompletionProvider chat,
+        ScanScenario scenario,
+        string context,
+        string debateText,
+        string kbBlock,
+        string toolBlock,
+        string webBlock,
+        IReadOnlyList<string>? rejectionFeedback,
+        CancellationToken cancellationToken)
+    {
+        var retryBlock = rejectionFeedback is { Count: > 0 }
+            ? $"""
+
+            VERIFY FAILED — rewrite JSON without these unsafe steps:
+            {string.Join("\n", rejectionFeedback.Select(r => "- " + r))}
+            Forbidden: DISM, SFC, registry edits, sc/net start/stop, elevated PowerShell.
+            Prefer Settings UI paths and ms-settings: links only.
+            """
+            : string.Empty;
+
+        return chat.CompleteAsync(
             CouncilAgents.GetSystemPrompt(CouncilAgents.ChiefCouncilor),
             $"""
             Scenario: {scenario.GetTitle()}
@@ -127,17 +255,75 @@ public sealed class CouncilAgentGraph
 
             Web:
             {webBlock}
+            {retryBlock}
             """,
             cancellationToken: cancellationToken);
+    }
 
-        return new CouncilGraphResult
+    /// <summary>
+    /// Last-resort filter when the retry still returns unsafe steps: drop offending steps from JSON.
+    /// </summary>
+    internal static string StripUnsafeSteps(string chiefRaw)
+    {
+        try
         {
-            Messages = messages,
-            ChiefRaw = chiefRaw,
-            ToolContextBlock = toolBlock,
-            UsedToolPath = usedToolPath,
-            ToolsInvoked = toolsInvoked
-        };
+            var json = ExtractJson(chiefRaw);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement.Clone();
+            if (!root.TryGetProperty("steps", out var steps) || steps.ValueKind != JsonValueKind.Array)
+            {
+                return chiefRaw;
+            }
+
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream))
+            {
+                writer.WriteStartObject();
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.NameEquals("steps"))
+                    {
+                        writer.WritePropertyName("steps");
+                        writer.WriteStartArray();
+                        foreach (var step in prop.Value.EnumerateArray())
+                        {
+                            var title = step.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                            var instructions = step.TryGetProperty("instructions", out var i)
+                                ? i.GetString() ?? ""
+                                : "";
+                            var link = step.TryGetProperty("linkUrl", out var l) && l.ValueKind == JsonValueKind.String
+                                ? l.GetString()
+                                : null;
+                            if (!FixStepVerifier.DescribeUnsafe(title, instructions, link).Any())
+                            {
+                                step.WriteTo(writer);
+                            }
+                        }
+
+                        writer.WriteEndArray();
+                    }
+                    else
+                    {
+                        prop.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            return Encoding.UTF8.GetString(stream.ToArray());
+        }
+        catch
+        {
+            return chiefRaw;
+        }
+    }
+
+    private static string ExtractJson(string text)
+    {
+        var start = text.IndexOf('{');
+        var end = text.LastIndexOf('}');
+        return start >= 0 && end > start ? text[start..(end + 1)] : text;
     }
 
     private async Task<(string Block, IReadOnlyList<string> InvokedNames)> InvokeReadOnlyToolsAsync(
@@ -312,4 +498,5 @@ public sealed class CouncilGraphResult
     public required string ToolContextBlock { get; init; }
     public required bool UsedToolPath { get; init; }
     public IReadOnlyList<string> ToolsInvoked { get; init; } = [];
+    public CouncilTrace? Trace { get; init; }
 }

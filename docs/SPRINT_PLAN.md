@@ -33,7 +33,7 @@
 | 2 | Sensor history + alert engine | ✅ Done | Sprint 1 |
 | 3 | Guided fixes + alerts UI | ✅ Done | Sprint 2 |
 | 4 | Classic ML (Microsoft.ML) | ✅ Done | Sprint 2 |
-| 5 | AI polish (RAG, agent, settings) | ⬜ Not started | Sprint 4 |
+| 5 | AI polish (RAG, agent, settings) | ✅ Done | Sprint 4 |
 | 6 | Cloud adapters (Azure + secrets) | ⬜ Not started | Sprint 5 |
 | 7 | Quality loop + portfolio | ⬜ Not started | Sprint 6 |
 | 8 | UX optimization + settings full | ⬜ Not started | Sprint 3 |
@@ -334,12 +334,12 @@ Run dotnet test before finishing. Mark Sprint 4 ✅ in docs/SPRINT_PLAN.md and A
 
 ### Definition of Done
 
-- [ ] Settings UI switches chat provider without editing appsettings manually
-- [ ] Guide shows agent trace after council run
-- [ ] Unsafe step triggers verify/retry path (test proves it)
-- [ ] 15+ playbooks; hybrid retrieval test passes
-- [ ] Golden count ≥15; CI gate enforced
-- [ ] All existing privacy tests pass
+- [x] Settings UI switches chat provider without editing appsettings manually
+- [x] Guide shows agent trace after council run
+- [x] Unsafe step triggers verify/retry path (test proves it)
+- [x] 15+ playbooks; hybrid retrieval test passes
+- [x] Golden count ≥15; CI gate enforced
+- [x] All existing privacy tests pass
 
 ### Verify
 

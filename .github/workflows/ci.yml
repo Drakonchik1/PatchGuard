@@ -25,3 +25,9 @@ jobs:
 
       - name: Test
         run: dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj --no-build -c Release --verbosity normal
+
+      - name: Golden threshold gate
+        run: >
+          dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj --no-build -c Release
+          --filter "FullyQualifiedName~GoldenAveragesMustNotDropMoreThanFivePercentVsBaseline"
+          --verbosity normal

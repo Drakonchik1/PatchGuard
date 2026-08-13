@@ -1,0 +1,44 @@
+﻿{
+  "name": "startup-bloat-cleanup",
+  "scenario": "FullSystemAudit",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council tied slow logon symptoms to excess startup apps rather than disk failure.",
+    "chiefVerdict": "Disable unused startup entries, reboot once, then measure time-to-desktop again.",
+    "sources": [ "Local", "KnowledgeBase" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Researcher",
+        "content": "KB/startup-bloat recommends disabling chat and updater launchers before uninstalling anything.",
+        "headline": "Startup playbook",
+        "phase": "Research",
+        "round": 1,
+        "confidence": 76
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Open Startup Apps",
+        "instructions": "Open Startup Apps settings and disable unused chat clients and auto-updaters that you do not need at logon.",
+        "copyText": "ms-settings:startupapps"
+      },
+      {
+        "order": 2,
+        "title": "Reboot and compare",
+        "instructions": "Restart Windows once, then re-run the full audit so PatchGuard can compare post-logon load against this baseline.",
+        "copyText": "Run Full system audit"
+      }
+    ],
+    "webReferences": [],
+    "knowledgeReferences": [
+      {
+        "title": "Startup app bloat",
+        "playbookId": "startup-bloat",
+        "usedFor": "Slow logon with many auto-start programs",
+        "score": 0.84
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+﻿{
+  "name": "memory-pressure-working-set",
+  "scenario": "QuickHealthCheck",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council prioritized reclaiming RAM working sets before chasing secondary noise.",
+    "chiefVerdict": "Trim heavy background apps first, then rescan to confirm memory pressure eased.",
+    "sources": [ "Local" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Technician",
+        "content": "Committed memory is elevated while disk and update services look healthy.",
+        "headline": "RAM first",
+        "phase": "Analysis",
+        "round": 1,
+        "confidence": 80
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Close heavy apps",
+        "instructions": "Close the largest non-essential apps in Task Manager and keep only what you need for the next hour of work.",
+        "copyText": "Task Manager"
+      },
+      {
+        "order": 2,
+        "title": "Free working sets",
+        "instructions": "Run the PatchGuard Optimize step that frees RAM working sets, then re-open only required apps.",
+        "copyText": "Free up RAM (working sets)"
+      }
+    ],
+    "webReferences": []
+  }
+}

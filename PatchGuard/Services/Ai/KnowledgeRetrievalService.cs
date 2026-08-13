@@ -84,6 +84,9 @@ public sealed class KnowledgeRetrievalService : IKnowledgeRetrievalService, IDis
         }
     }
 
+    /// <summary>Weight for embedding cosine vs keyword overlap in hybrid ranking.</summary>
+    public const double EmbeddingWeight = 0.65;
+
     public async Task<IReadOnlyList<KnowledgeHit>> RetrieveAsync(
         string query,
         int topK = 3,
@@ -97,17 +100,77 @@ public sealed class KnowledgeRetrievalService : IKnowledgeRetrievalService, IDis
         }
 
         var queryVector = await _embeddings.EmbedAsync(query, cancellationToken);
+        var queryTokens = Tokenize(query);
         return _chunks
-            .Select(chunk => new KnowledgeHit
+            .Select(chunk =>
             {
-                Chunk = chunk,
-                Query = query,
-                Score = CosineSimilarity(queryVector, chunk.Embedding ?? [])
+                var embeddingScore = CosineSimilarity(queryVector, chunk.Embedding ?? []);
+                var keywordScore = KeywordOverlap(queryTokens, chunk);
+                return new KnowledgeHit
+                {
+                    Chunk = chunk,
+                    Query = query,
+                    Score = HybridScore(embeddingScore, keywordScore)
+                };
             })
             .Where(hit => hit.Score > 0)
             .OrderByDescending(hit => hit.Score)
             .Take(topK)
             .ToList();
+    }
+
+    public static double HybridScore(double embeddingScore, double keywordScore) =>
+        EmbeddingWeight * embeddingScore + (1 - EmbeddingWeight) * keywordScore;
+
+    public static double KeywordOverlap(IReadOnlyCollection<string> queryTokens, KnowledgeChunk chunk)
+    {
+        if (queryTokens.Count == 0)
+        {
+            return 0;
+        }
+
+        var docTokens = Tokenize($"{chunk.Title}\n{chunk.Content}");
+        if (docTokens.Count == 0)
+        {
+            return 0;
+        }
+
+        var overlap = queryTokens.Count(t => docTokens.Contains(t));
+        return (double)overlap / queryTokens.Count;
+    }
+
+    public static HashSet<string> Tokenize(string text)
+    {
+        var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var span = text.AsSpan();
+        var start = -1;
+        for (var i = 0; i <= span.Length; i++)
+        {
+            var atEnd = i == span.Length;
+            var isLetterOrDigit = !atEnd && char.IsLetterOrDigit(span[i]);
+            if (isLetterOrDigit)
+            {
+                if (start < 0)
+                {
+                    start = i;
+                }
+
+                continue;
+            }
+
+            if (start >= 0)
+            {
+                var length = i - start;
+                if (length >= 2)
+                {
+                    tokens.Add(span.Slice(start, length).ToString());
+                }
+
+                start = -1;
+            }
+        }
+
+        return tokens;
     }
 
     public async Task<IReadOnlyList<KnowledgeHit>> RetrieveForFindingsAsync(

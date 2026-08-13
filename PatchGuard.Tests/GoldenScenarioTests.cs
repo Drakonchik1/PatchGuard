@@ -8,6 +8,11 @@ namespace PatchGuard.Tests;
 
 public sealed class GoldenScenarioTests
 {
+    /// <summary>Sprint 5 locked baseline averages (15 fixtures).</summary>
+    public const double BaselineActionability = 94.4;
+    public const double BaselineConsistency = 96.7;
+    public const double MaxRegressionRatio = 0.05;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -17,11 +22,11 @@ public sealed class GoldenScenarioTests
     private readonly CouncilEvaluator _evaluator = new();
 
     [Fact]
-    public void TenGoldenScenariosMatchExpectedBaselineScores()
+    public void FifteenGoldenScenariosMatchExpectedBaselineScores()
     {
         var scenarios = LoadScenarios();
 
-        Assert.Equal(10, scenarios.Count);
+        Assert.True(scenarios.Count >= 15, $"Expected ≥15 golden fixtures, found {scenarios.Count}.");
 
         foreach (var scenario in scenarios)
         {
@@ -39,8 +44,34 @@ public sealed class GoldenScenarioTests
         var averageActionability = Math.Round(scenarios.Average(s => s.ExpectedActionabilityScore), 1);
         var averageConsistency = Math.Round(scenarios.Average(s => s.ExpectedConsistencyScore), 1);
 
-        Assert.Equal(91.7, averageActionability);
-        Assert.Equal(95.0, averageConsistency);
+        Assert.Equal(BaselineActionability, averageActionability);
+        Assert.Equal(BaselineConsistency, averageConsistency);
+    }
+
+    [Fact]
+    public void GoldenAveragesMustNotDropMoreThanFivePercentVsBaseline()
+    {
+        var scenarios = LoadScenarios();
+        var averageActionability = scenarios.Average(s =>
+        {
+            var metrics = _evaluator.Evaluate(s.Guide);
+            return metrics.ActionabilityScore;
+        });
+        var averageConsistency = scenarios.Average(s =>
+        {
+            var metrics = _evaluator.Evaluate(s.Guide);
+            return metrics.ConsistencyScore;
+        });
+
+        var minActionability = BaselineActionability * (1 - MaxRegressionRatio);
+        var minConsistency = BaselineConsistency * (1 - MaxRegressionRatio);
+
+        Assert.True(
+            averageActionability >= minActionability,
+            $"Actionability {averageActionability:F1} dropped more than 5% below baseline {BaselineActionability}.");
+        Assert.True(
+            averageConsistency >= minConsistency,
+            $"Consistency {averageConsistency:F1} dropped more than 5% below baseline {BaselineConsistency}.");
     }
 
     private static IReadOnlyList<GoldenScenarioFixture> LoadScenarios()
