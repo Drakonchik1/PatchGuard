@@ -1,0 +1,30 @@
+{
+  "name": "short-instruction-regression",
+  "scenario": "QuickHealthCheck",
+  "expectedActionabilityScore": 66.7,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council suggested a disk check but one step used an overly terse instruction string.",
+    "chiefVerdict": "Verify free space manually before applying any deeper cleanup actions.",
+    "sources": [ "Local" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Skeptic",
+        "content": "The disk warning is real, but the first step lacks enough detail for a novice operator.",
+        "headline": "Instruction too short",
+        "phase": "Debate",
+        "round": 1,
+        "confidence": 68
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Check free space",
+        "instructions": "Check disk.",
+        "copyText": "ms-settings:storagesense"
+      }
+    ],
+    "webReferences": []
+  }
+}

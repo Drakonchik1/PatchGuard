@@ -45,7 +45,22 @@ public static class DependencyInjection
             OllamaBaseUrl = configuration[$"{AiOptions.OllamaSection}:BaseUrl"]
                 ?? "http://localhost:11434",
             OllamaModel = configuration[$"{AiOptions.OllamaSection}:Model"]
-                ?? "qwen3.5:latest"
+                ?? "llama3.2:3b",
+            OllamaNumPredict = int.TryParse(
+                configuration[$"{AiOptions.OllamaSection}:NumPredict"], out var numPredict)
+                ? numPredict
+                : 512,
+            OllamaNumCtx = int.TryParse(
+                configuration[$"{AiOptions.OllamaSection}:NumCtx"], out var numCtx)
+                ? numCtx
+                : 4096,
+            OllamaTemperature = double.TryParse(
+                configuration[$"{AiOptions.OllamaSection}:Temperature"],
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var temperature)
+                ? temperature
+                : 0.35
         };
 
         services.AddSingleton(aiOptions);
@@ -57,8 +72,8 @@ public static class DependencyInjection
         services.AddHttpClient<OllamaChatProvider>((_, client) =>
         {
             client.BaseAddress = new Uri(OllamaChatProvider.NormalizeBaseUrl(aiOptions.OllamaBaseUrl));
-            // Local models often need longer than the default 100s HttpClient timeout.
-            client.Timeout = TimeSpan.FromMinutes(5);
+            // Small local models still need headroom for ~13 sequential council calls.
+            client.Timeout = TimeSpan.FromMinutes(8);
         });
         services.AddHttpClient<OpenAiEmbeddingService>();
         services.AddHttpClient<TavilyWebSearchService>();

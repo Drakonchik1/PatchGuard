@@ -91,7 +91,7 @@ public sealed class AiPrivacyAndProvenanceTests
         {
             OllamaEnabled = true,
             OllamaBaseUrl = "http://localhost:11434",
-            OllamaModel = "qwen3.5:latest",
+            OllamaModel = "llama3.2:3b",
             ChatProvider = ChatProviderResolver.ModeAuto
         };
         var service = CreateService(openAiHandler, search, options: options, ollamaHandler: ollamaHandler);

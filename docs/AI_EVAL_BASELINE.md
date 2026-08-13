@@ -73,7 +73,7 @@ Same council loop (analysis → research → debate → verdict), different chat
 Config (`appsettings.json`):
 
 - `Ai:ChatProvider` = `Auto` | `OpenAI` | `Ollama` | `Rules`
-- `Ollama:Enabled` / `BaseUrl` / `Model` (default `qwen3.5:latest`)
+- `Ollama:Enabled` / `BaseUrl` / `Model` (default `llama3.2:3b`, ~2 GB)
 
 `Auto` without consent prefers Ollama when enabled; with consent prefers OpenAI when an API key is set. HTTP failures fall back to rules. Eval `Source` uses `Ollama` / `Ollama+KB` (vs cloud `AI` / `AI+KB`). Guide UI shows **Local LLM (Ollama)** for local runs.
 
@@ -87,21 +87,26 @@ Sprint execution and golden expansion targets: [SPRINT_PLAN.md](SPRINT_PLAN.md) 
 
 ## Golden baseline
 
-The baseline is defined by **5** curated golden fixtures in
-`PatchGuard.Tests/Fixtures/GoldenScenarios` (expand per sprint plan).
+The baseline is defined by **10** curated golden fixtures in
+`PatchGuard.Tests/Fixtures/GoldenScenarios`.
 
 Current verified averages:
 
-- Average actionability: `90.0%`
-- Average consistency: `93.3%`
+- Average actionability: `91.7%`
+- Average consistency: `95.0%`
 
 Per-fixture expected scores:
 
 - `after-update-service-recovery`: `100.0 / 100.0`
+- `ai-augmented-health-check`: `100.0 / 100.0`
+- `critical-disk-pressure-response`: `100.0 / 100.0`
 - `driver-remediation-with-web`: `100.0 / 100.0`
-- `manual-verification-only`: `66.7 / 100.0`
+- `kb-grounded-update-playbook`: `100.0 / 100.0`
+- `kb-provenance-drift`: `100.0 / 83.3`
 - `duplicate-step-regression`: `100.0 / 83.3`
 - `web-only-provenance-drift`: `83.3 / 83.3`
+- `manual-verification-only`: `66.7 / 100.0`
+- `short-instruction-regression`: `66.7 / 100.0`
 
 Format: `ActionabilityScore / ConsistencyScore`
 

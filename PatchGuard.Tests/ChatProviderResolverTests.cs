@@ -126,7 +126,7 @@ public sealed class OllamaChatProviderTests
         {
             OllamaEnabled = true,
             OllamaBaseUrl = "http://localhost:11434",
-            OllamaModel = "qwen3.5:latest"
+            OllamaModel = "llama3.2:3b"
         };
         var provider = new OllamaChatProvider(new HttpClient(handler)
         {
@@ -138,15 +138,16 @@ public sealed class OllamaChatProviderTests
         Assert.Equal("hello from ollama", reply);
         Assert.Contains("/api/chat", handler.RequestUri, StringComparison.OrdinalIgnoreCase);
         using var doc = JsonDocument.Parse(handler.Payload);
-        Assert.Equal("qwen3.5:latest", doc.RootElement.GetProperty("model").GetString());
+        Assert.Equal("llama3.2:3b", doc.RootElement.GetProperty("model").GetString());
         Assert.False(doc.RootElement.GetProperty("stream").GetBoolean());
+        Assert.Equal(512, doc.RootElement.GetProperty("options").GetProperty("num_predict").GetInt32());
     }
 
     [Fact]
     public async Task CompleteAsyncThrowsWhenEmptyContent()
     {
         var handler = new EmptyContentHandler();
-        var options = new AiOptions { OllamaEnabled = true, OllamaModel = "qwen3.5:latest" };
+        var options = new AiOptions { OllamaEnabled = true, OllamaModel = "llama3.2:3b" };
         var provider = new OllamaChatProvider(new HttpClient(handler)
         {
             BaseAddress = new Uri("http://localhost:11434/")

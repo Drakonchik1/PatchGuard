@@ -210,7 +210,7 @@ public sealed class WpfSmokeTests
             {
                 window.Show();
                 window.UpdateLayout();
-                Assert.True(window.Activate());
+                _ = window.Activate();
                 Assert.True(comboBox.Focus());
                 Assert.Same(comboBox, Keyboard.FocusedElement);
 

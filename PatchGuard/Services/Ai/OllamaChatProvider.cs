@@ -70,7 +70,13 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
         {
             model = _options.OllamaModel,
             stream = false,
-            messages
+            messages,
+            options = new
+            {
+                num_predict = Math.Clamp(_options.OllamaNumPredict, 64, 4096),
+                num_ctx = Math.Clamp(_options.OllamaNumCtx, 2048, 32768),
+                temperature = Math.Clamp(_options.OllamaTemperature, 0, 2)
+            }
         };
 
         var json = JsonSerializer.Serialize(body, JsonOptions);

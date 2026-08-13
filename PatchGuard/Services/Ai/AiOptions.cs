@@ -20,5 +20,16 @@ public sealed class AiOptions
     public bool OllamaEnabled { get; set; }
 
     public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
-    public string OllamaModel { get; set; } = "qwen3.5:latest";
+
+    /// <summary>Default: llama3.2:3b (~2 GB) — fast enough for multi-step council on typical PCs.</summary>
+    public string OllamaModel { get; set; } = "llama3.2:3b";
+
+    /// <summary>Cap generated tokens per chat call (council prompts ask for &lt;130 words).</summary>
+    public int OllamaNumPredict { get; set; } = 512;
+
+    /// <summary>Context window — enough for KB + transcript without loading huge KV cache.</summary>
+    public int OllamaNumCtx { get; set; } = 4096;
+
+    /// <summary>Lower = faster, more deterministic repair steps.</summary>
+    public double OllamaTemperature { get; set; } = 0.35;
 }

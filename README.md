@@ -116,7 +116,7 @@ Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Developme
   "Ollama": {
     "Enabled": true,
     "BaseUrl": "http://localhost:11434",
-    "Model": "qwen3.5:latest"
+    "Model": "llama3.2:3b"
   }
 }
 ```
@@ -146,7 +146,8 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md) | AI competence phases (done + planned) |
 | [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) | Sprint-by-sprint build plan (one chat = one sprint) |
 | [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) | Install Ollama / switch models |
-| [docs/AI_EVAL_BASELINE.md](docs/AI_EVAL_BASELINE.md) | Eval metrics + RAG/LLM notes |
+| [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) | Council, RAG, providers, agent graph |
+| [docs/AI_EVAL_BASELINE.md](docs/AI_EVAL_BASELINE.md) | Eval metrics + golden baseline |
 | [docs/AI_EVAL_RESULTS.md](docs/AI_EVAL_RESULTS.md) | Provider comparison worksheet |
 
 ## Roadmap status
@@ -155,7 +156,7 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 
 | Sprint | Focus | Status |
 |--------|-------|--------|
-| 1 | CI + golden×10 + architecture doc | ⬜ |
+| 1 | CI + golden×10 + architecture doc | ✅ |
 | 2 | Sensor history + alerts | ⬜ |
 | 3 | Guided fixes + alerts UI | ⬜ |
 | 4 | Classic ML (inference-only) | ⬜ |

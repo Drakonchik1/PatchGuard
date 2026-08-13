@@ -17,11 +17,11 @@ public sealed class GoldenScenarioTests
     private readonly CouncilEvaluator _evaluator = new();
 
     [Fact]
-    public void FiveGoldenScenariosMatchExpectedBaselineScores()
+    public void TenGoldenScenariosMatchExpectedBaselineScores()
     {
         var scenarios = LoadScenarios();
 
-        Assert.Equal(5, scenarios.Count);
+        Assert.Equal(10, scenarios.Count);
 
         foreach (var scenario in scenarios)
         {
@@ -39,8 +39,8 @@ public sealed class GoldenScenarioTests
         var averageActionability = Math.Round(scenarios.Average(s => s.ExpectedActionabilityScore), 1);
         var averageConsistency = Math.Round(scenarios.Average(s => s.ExpectedConsistencyScore), 1);
 
-        Assert.Equal(90.0, averageActionability);
-        Assert.Equal(93.3, averageConsistency);
+        Assert.Equal(91.7, averageActionability);
+        Assert.Equal(95.0, averageConsistency);
     }
 
     private static IReadOnlyList<GoldenScenarioFixture> LoadScenarios()

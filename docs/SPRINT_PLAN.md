@@ -29,7 +29,7 @@
 
 | Sprint | Name | Status | Depends on |
 |--------|------|--------|------------|
-| 1 | Stabilize baseline + CI | ⬜ Not started | — |
+| 1 | Stabilize baseline + CI | ✅ Done | — |
 | 2 | Sensor history + alert engine | ⬜ Not started | Sprint 1 |
 | 3 | Guided fixes + alerts UI | ⬜ Not started | Sprint 2 |
 | 4 | Classic ML (Microsoft.ML) | ⬜ Not started | Sprint 2 |
@@ -60,11 +60,11 @@ Status values: ⬜ Not started · 🔄 In progress · ✅ Done
 
 ### Definition of Done
 
-- [ ] CI workflow exists and passes on current branch
-- [ ] `GoldenScenarioTests` expects **10** scenarios, all pass
-- [ ] `AI_EVAL_RESULTS.md` has real numbers for Rules and Ollama (OpenAI row optional)
-- [ ] `docs/AI_ARCHITECTURE.md` exists with at least one architecture diagram
-- [ ] `dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj` — 0 failures
+- [x] CI workflow exists and passes on current branch
+- [x] `GoldenScenarioTests` expects **10** scenarios, all pass
+- [x] `AI_EVAL_RESULTS.md` has real numbers for Rules and Ollama (OpenAI row optional)
+- [x] `docs/AI_ARCHITECTURE.md` exists with at least one architecture diagram
+- [x] `dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj` — 0 failures
 
 ### Verify
 

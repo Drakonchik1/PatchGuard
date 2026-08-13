@@ -1,0 +1,36 @@
+{
+  "name": "critical-disk-pressure-response",
+  "scenario": "FullSystemAudit",
+  "expectedActionabilityScore": 100.0,
+  "expectedConsistencyScore": 100.0,
+  "guide": {
+    "summary": "Council prioritized critical free-space pressure on the system volume before any secondary tuning.",
+    "chiefVerdict": "Reclaim space on the system drive first, then rerun the full audit to confirm the warning cleared.",
+    "sources": [ "Local" ],
+    "councilDiscussion": [
+      {
+        "agentRole": "Technician",
+        "content": "Free space on C: is below the safe threshold and blocks reliable update and paging behavior.",
+        "headline": "Disk pressure",
+        "phase": "Analysis",
+        "round": 1,
+        "confidence": 88
+      }
+    ],
+    "steps": [
+      {
+        "order": 1,
+        "title": "Open Storage settings",
+        "instructions": "Open Storage settings and remove temporary files, old Windows Update cleanup, and large downloads from the system volume.",
+        "copyText": "ms-settings:storagesense"
+      },
+      {
+        "order": 2,
+        "title": "Empty Recycle Bin",
+        "instructions": "Empty the Recycle Bin and confirm at least 10 GB of free space remains on the system drive before continuing.",
+        "copyText": "Empty Recycle Bin"
+      }
+    ],
+    "webReferences": []
+  }
+}

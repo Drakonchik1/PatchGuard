@@ -12,10 +12,15 @@
 - Phase 2 diagnostic journey: step indicator, unified scoring, actionable findings, optional AI with consent + provenance.
 
 ### AI competencies
-- Phase 0: golden eval harness (5 fixtures), `CouncilEvaluator`, `CouncilEvaluationRecord`, baseline docs.
+- Phase 0: golden eval harness (**10** fixtures), `CouncilEvaluator`, `CouncilEvaluationRecord`, baseline docs.
 - Phase 1 RAG: local playbook KB (6 playbooks), retrieval, KnowledgeBase provenance (offline embeddings).
-- Phase 2 Local LLM: Ollama via `IChatCompletionProvider`, Auto/OpenAI/Ollama/Rules, council without cloud key.
+- Phase 2 Local LLM: Ollama via `IChatCompletionProvider`, Auto/OpenAI/Ollama/Rules, default **`llama3.2:3b`**.
 - Phase 3 Agentic: `CouncilAgentGraph` (conditional path) + SK read-only tools + `DetailedExplanation`.
+
+### Sprint 1 (done)
+- GitHub Actions CI (`.github/workflows/ci.yml`)
+- Golden fixtures 5 → **10**; averages 91.7% / 95.0%
+- `docs/AI_ARCHITECTURE.md`, filled `docs/AI_EVAL_RESULTS.md` (Rules + Ollama sample scan)
 
 ### Docs & security
 - `docs/SPRINT_PLAN.md`, `docs/AI_ROADMAP.md`, `docs/UX_ROADMAP.md`, `docs/OLLAMA_SETUP.md`
@@ -24,7 +29,7 @@
 ## Run
 
 ```powershell
-ollama pull qwen3.5:latest   # optional local LLM
+ollama pull llama3.2:3b   # optional local LLM (~2 GB, default)
 dotnet run --project PatchGuard/PatchGuard.csproj
 dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj
 ```
@@ -36,7 +41,7 @@ Model switch: `docs/OLLAMA_SETUP.md`.
 
 | Sprint | Focus | Status |
 |--------|-------|--------|
-| 1 | CI + golden×10 + `AI_ARCHITECTURE.md` | ⬜ |
+| 1 | CI + golden×10 + `AI_ARCHITECTURE.md` | ✅ |
 | 2 | Sensor history + alert engine | ⬜ |
 | 3 | Guided fixes + alerts UI | ⬜ |
 | 4 | Classic ML (inference-only) | ⬜ |
@@ -49,22 +54,19 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 
 ## Next sprint
 
-**Sprint 1** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) into a new chat.
+**Sprint 2** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) (Sensor history + alert engine).
 
 ## Remaining gaps (by sprint)
 
 | Gap | Sprint |
 |-----|--------|
-| GitHub Actions CI | 1 |
-| Golden fixtures 5 → 10–20 | 1, 5 |
-| `AI_EVAL_RESULTS.md` filled | 1 |
-| `AI_ARCHITECTURE.md` | 1 |
 | Sensor history + alerts | 2–3 |
 | Guided fix pipeline | 3 |
 | Microsoft.ML anomaly (no training UI) | 4 |
 | Settings provider radio, agent trace, hybrid RAG | 5 |
+| Golden 10 → 15–20, CI threshold gate | 5, 7 |
 | Azure OpenAI + secrets | 6 |
-| CI threshold gate, demo script, experiment | 7 |
+| Demo script, controlled experiment | 7 |
 | Gaming Mode, settings full, history compare | 8 |
 | n8n KB reindex export | 7 (optional) |
 
@@ -73,6 +75,8 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 | Area | Path |
 |------|------|
 | Sprint plan | `docs/SPRINT_PLAN.md` |
+| AI architecture | `docs/AI_ARCHITECTURE.md` |
+| Eval results | `docs/AI_EVAL_RESULTS.md` |
 | Chat providers | `PatchGuard/Services/Ai/IChatCompletionProvider.cs`, `OllamaChatProvider.cs`, `OpenAiChatClient.cs` |
 | Agentic graph | `PatchGuard/Services/Ai/CouncilAgentGraph.cs`, `SemanticKernelToolHost.cs` |
 | RAG | `PatchGuard/Services/Ai/KnowledgeRetrievalService.cs` |
