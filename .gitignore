@@ -2,6 +2,7 @@ bin/
 obj/
 .vs/
 .worktrees/
+artifacts/
 *.user
 appsettings.Development.json
 PatchGuard/appsettings.Development.json

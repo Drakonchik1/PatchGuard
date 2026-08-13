@@ -14,60 +14,98 @@ namespace PatchGuard.Services.Hardware;
 public sealed class LibreHardwareMonitorService : IHardwareMonitorService
 {
     private readonly IAdminElevationService _elevation;
+    private readonly IOsThermalTemperatureSource _osThermal;
     private readonly object _gate = new();
     private readonly UpdateVisitor _visitor = new();
 
     private Computer? _computer;
     private bool _initFailed;
     private bool _disposed;
+    private bool _needsWarmup;
 
-    public LibreHardwareMonitorService(IAdminElevationService elevation)
+    public LibreHardwareMonitorService(
+        IAdminElevationService elevation,
+        IOsThermalTemperatureSource? osThermal = null)
     {
         _elevation = elevation;
+        _osThermal = osThermal ?? new WindowsThermalZoneTemperatureSource();
     }
 
     public HardwareSnapshot Capture()
     {
         lock (_gate)
         {
-            var snapshot = new HardwareSnapshot();
+            var state = new CaptureState();
 
             if (_disposed)
             {
-                snapshot.MonitorUnavailable = true;
-                snapshot.StatusMessage = "Hardware monitor has been shut down.";
-                return snapshot;
+                state.Snapshot.MonitorUnavailable = true;
+                state.Snapshot.StatusMessage = "Hardware monitor has been shut down.";
+                return state.Snapshot;
             }
 
-            if (!TryEnsureComputer(snapshot))
+            if (!TryEnsureComputer(state.Snapshot))
             {
-                FillRamFromOs(snapshot);
-                return snapshot;
+                FillRamFromOs(state.Snapshot);
+                return state.Snapshot;
             }
 
             try
             {
+                // ADL / AMD SMU sensors often need several Update passes after Open()
+                // before Tctl/Tdie and package power leave the zero stub state.
                 _computer!.Accept(_visitor);
+                if (_needsWarmup)
+                {
+                    _computer.Accept(_visitor);
+                    _computer.Accept(_visitor);
+                    _needsWarmup = false;
+                }
+
                 foreach (var hardware in _computer.Hardware)
                 {
-                    ReadHardware(hardware, snapshot);
+                    ReadHardware(hardware, state);
                 }
             }
             catch (Exception ex)
             {
-                snapshot.StatusMessage = $"Sensor read error: {ex.Message}";
+                state.Snapshot.StatusMessage = $"Sensor read error: {ex.Message}";
             }
 
-            if (snapshot.RamTotalGb is null or 0)
+            if (state.Snapshot.RamTotalGb is null or 0)
             {
-                FillRamFromOs(snapshot);
+                FillRamFromOs(state.Snapshot);
             }
 
-            snapshot.SensorsLimited = snapshot is { CpuTemperatureC: null, GpuTemperatureC: null }
-                                      && !_elevation.IsElevated;
+            ApplyOsThermalFallback(state.Snapshot);
+            FinalizeSensorAvailability(state.Snapshot, _elevation.IsElevated);
 
-            return snapshot;
+            return state.Snapshot;
         }
+    }
+
+    private void ApplyOsThermalFallback(HardwareSnapshot snapshot)
+    {
+        if (snapshot.CpuTemperatureC is not null)
+        {
+            return;
+        }
+
+        var osTemp = _osThermal.TryReadCpuTemperatureC();
+        if (osTemp is not { } temp || !IsPlausibleTemperature(temp))
+        {
+            return;
+        }
+
+        snapshot.CpuTemperatureC = temp;
+        snapshot.Sensors.Add(new SensorReading
+        {
+            Hardware = "Windows Thermal Zone",
+            Name = "CPU (ACPI)",
+            Kind = SensorKind.Temperature,
+            Value = temp,
+            Unit = "°C"
+        });
     }
 
     private bool TryEnsureComputer(HardwareSnapshot snapshot)
@@ -92,12 +130,13 @@ public sealed class LibreHardwareMonitorService : IHardwareMonitorService
                 IsGpuEnabled = true,
                 IsMemoryEnabled = true,
                 IsMotherboardEnabled = true,
-                IsControllerEnabled = false,
+                IsControllerEnabled = true,
                 IsNetworkEnabled = false,
                 IsStorageEnabled = false
             };
             computer.Open();
             _computer = computer;
+            _needsWarmup = true;
             return true;
         }
         catch (Exception ex)
@@ -109,31 +148,45 @@ public sealed class LibreHardwareMonitorService : IHardwareMonitorService
         }
     }
 
-    private static void ReadHardware(IHardware hardware, HardwareSnapshot snapshot)
+    private static void ReadHardware(IHardware hardware, CaptureState state)
     {
+        var snapshot = state.Snapshot;
         var isCpu = hardware.HardwareType == HardwareType.Cpu;
         var isGpu = hardware.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
         var isMemory = hardware.HardwareType == HardwareType.Memory;
+        var isSecondaryTempHost = hardware.HardwareType is HardwareType.Motherboard
+            or HardwareType.Cooler
+            or HardwareType.EmbeddedController;
+        var gpuPreference = GpuPreference(hardware.HardwareType);
 
         if (isCpu)
         {
             snapshot.CpuName = hardware.Name;
         }
-        else if (isGpu)
+        else if (isGpu && gpuPreference >= state.GpuPreference)
         {
+            // Prefer discrete AMD/NVIDIA over integrated Intel when both exist.
+            if (gpuPreference > state.GpuPreference)
+            {
+                ClearGpuSummary(snapshot);
+                state.GpuPreference = gpuPreference;
+            }
+
             snapshot.GpuName = hardware.Name;
         }
 
+        var applyGpuSummary = isGpu && gpuPreference >= state.GpuPreference;
+
         foreach (var sensor in hardware.Sensors)
         {
-            if (sensor.Value is not float raw || float.IsNaN(raw))
+            if (sensor.Value is not float raw || float.IsNaN(raw) || float.IsInfinity(raw))
             {
                 continue;
             }
 
             var value = raw;
             var kind = MapKind(sensor.SensorType);
-            if (kind is not null)
+            if (kind is not null && IsDisplayableSensor(kind.Value, value))
             {
                 snapshot.Sensors.Add(new SensorReading
                 {
@@ -147,67 +200,144 @@ public sealed class LibreHardwareMonitorService : IHardwareMonitorService
 
             if (isCpu)
             {
-                ApplyCpu(snapshot, sensor, value);
+                ApplyCpu(snapshot, sensor.SensorType, sensor.Name, value);
             }
-            else if (isGpu)
+            else if (applyGpuSummary)
             {
-                ApplyGpu(snapshot, sensor, value);
+                ApplyGpu(snapshot, sensor.SensorType, sensor.Name, value);
             }
             else if (isMemory)
             {
                 ApplyMemory(snapshot, sensor, value);
             }
+            else if (isSecondaryTempHost)
+            {
+                ApplyMotherboardCpuTemp(snapshot, sensor.SensorType, sensor.Name, value);
+            }
         }
 
         foreach (var sub in hardware.SubHardware)
         {
-            ReadHardware(sub, snapshot);
+            ReadHardware(sub, state);
         }
     }
 
-    private static void ApplyCpu(HardwareSnapshot snapshot, ISensor sensor, double value)
+    private static void ClearGpuSummary(HardwareSnapshot snapshot)
     {
-        switch (sensor.SensorType)
+        snapshot.GpuName = "GPU";
+        snapshot.GpuTemperatureC = null;
+        snapshot.GpuLoadPercent = null;
+        snapshot.GpuMemoryUsedMb = null;
+        snapshot.GpuMemoryTotalMb = null;
+        snapshot.GpuPowerWatts = null;
+    }
+
+    /// <summary>Higher wins when multiple GPUs are present (iGPU + dGPU).</summary>
+    public static int GpuPreference(HardwareType type) => type switch
+    {
+        HardwareType.GpuNvidia => 3,
+        HardwareType.GpuAmd => 3,
+        HardwareType.GpuIntel => 1,
+        _ => 0
+    };
+
+    public static void ApplyCpu(HardwareSnapshot snapshot, SensorType sensorType, string sensorName, double value)
+    {
+        switch (sensorType)
         {
-            case SensorType.Temperature when IsPreferredCpuTemp(sensor.Name):
-                snapshot.CpuTemperatureC = value;
+            case SensorType.Temperature when IsPreferredCpuTemp(sensorName):
+                if (IsPlausibleTemperature(value))
+                {
+                    snapshot.CpuTemperatureC = value;
+                }
                 break;
-            case SensorType.Temperature:
-                // Fall back to the hottest core if no package sensor is present.
+            case SensorType.Temperature when IsPlausibleTemperature(value):
+                // Fall back to the hottest core / CCD if no package sensor is present.
                 snapshot.CpuTemperatureC = snapshot.CpuTemperatureC is { } existing
                     ? Math.Max(existing, value)
                     : value;
                 break;
-            case SensorType.Load when sensor.Name.Contains("Total", StringComparison.OrdinalIgnoreCase):
+            case SensorType.Load when sensorName.Contains("Total", StringComparison.OrdinalIgnoreCase):
                 snapshot.CpuLoadPercent = value;
                 break;
-            case SensorType.Power when sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase):
+            case SensorType.Power when IsPlausiblePower(value)
+                                       && (sensorName.Contains("Package", StringComparison.OrdinalIgnoreCase)
+                                           || sensorName.Contains("PPT", StringComparison.OrdinalIgnoreCase)
+                                           || sensorName.Equals("CPU Cores", StringComparison.OrdinalIgnoreCase)):
                 snapshot.CpuPowerWatts = value;
                 break;
-            case SensorType.Clock when snapshot.CpuClockMhz is null && sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase):
+            case SensorType.Clock when snapshot.CpuClockMhz is null
+                                       && value > 0
+                                       && sensorName.Contains("Core", StringComparison.OrdinalIgnoreCase):
                 snapshot.CpuClockMhz = value;
                 break;
         }
     }
 
-    private static void ApplyGpu(HardwareSnapshot snapshot, ISensor sensor, double value)
+    /// <summary>
+    /// Hawk Point / newer Ryzen often expose a working CPU temp on the EC/motherboard
+    /// while Core (Tctl/Tdie) stays stuck at 0 in LibreHardwareMonitor.
+    /// </summary>
+    public static void ApplyMotherboardCpuTemp(
+        HardwareSnapshot snapshot,
+        SensorType sensorType,
+        string sensorName,
+        double value)
     {
-        switch (sensor.SensorType)
+        if (sensorType != SensorType.Temperature
+            || !IsPlausibleTemperature(value)
+            || !IsMotherboardCpuTempName(sensorName))
         {
-            case SensorType.Temperature when sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase):
-            case SensorType.Temperature when snapshot.GpuTemperatureC is null:
+            return;
+        }
+
+        if (snapshot.CpuTemperatureC is null)
+        {
+            snapshot.CpuTemperatureC = value;
+        }
+    }
+
+    /// <summary>
+    /// Maps GPU sensors including AMD ADL names (GPU Core / Hot Spot) and
+    /// D3D load fallbacks when PMLog core load is unavailable.
+    /// </summary>
+    public static void ApplyGpu(
+        HardwareSnapshot snapshot,
+        SensorType sensorType,
+        string sensorName,
+        double value)
+    {
+        switch (sensorType)
+        {
+            case SensorType.Temperature when IsPreferredGpuTemp(sensorName):
+                if (IsPlausibleTemperature(value))
+                {
+                    snapshot.GpuTemperatureC = value;
+                }
+                break;
+            case SensorType.Temperature when snapshot.GpuTemperatureC is null
+                                             && IsAcceptableGpuTemp(sensorName)
+                                             && IsPlausibleTemperature(value):
                 snapshot.GpuTemperatureC = value;
                 break;
-            case SensorType.Load when sensor.Name.Contains("Core", StringComparison.OrdinalIgnoreCase):
+            case SensorType.Load when IsPreferredGpuLoad(sensorName):
                 snapshot.GpuLoadPercent = value;
                 break;
-            case SensorType.SmallData when sensor.Name.Contains("Memory Used", StringComparison.OrdinalIgnoreCase):
+            case SensorType.Load when snapshot.GpuLoadPercent is null
+                                      && IsFallbackGpuLoad(sensorName):
+                snapshot.GpuLoadPercent = value;
+                break;
+            case SensorType.SmallData when sensorName.Contains("Memory Used", StringComparison.OrdinalIgnoreCase):
                 snapshot.GpuMemoryUsedMb = value;
                 break;
-            case SensorType.SmallData when sensor.Name.Contains("Memory Total", StringComparison.OrdinalIgnoreCase):
+            case SensorType.SmallData when sensorName.Contains("Memory Total", StringComparison.OrdinalIgnoreCase):
                 snapshot.GpuMemoryTotalMb = value;
                 break;
-            case SensorType.Power:
+            case SensorType.Power when IsPlausiblePower(value)
+                                       && (sensorName.Contains("Package", StringComparison.OrdinalIgnoreCase)
+                                           || sensorName.Contains("Total", StringComparison.OrdinalIgnoreCase)
+                                           || sensorName.Equals("GPU Core", StringComparison.OrdinalIgnoreCase)
+                                           || snapshot.GpuPowerWatts is null):
                 snapshot.GpuPowerWatts = value;
                 break;
         }
@@ -254,11 +384,82 @@ public sealed class LibreHardwareMonitorService : IHardwareMonitorService
         }
     }
 
+    private static void FinalizeSensorAvailability(HardwareSnapshot snapshot, bool isElevated)
+    {
+        var missingPackageTemps = snapshot is { CpuTemperatureC: null, GpuTemperatureC: null };
+        // Keep the "needs admin" meaning for UI/diagnostics; elevated AMD SMU zeros
+        // are communicated via StatusMessage instead.
+        snapshot.SensorsLimited = missingPackageTemps && !isElevated;
+
+        if (!string.IsNullOrWhiteSpace(snapshot.StatusMessage))
+        {
+            return;
+        }
+
+        if (snapshot.CpuTemperatureC is null)
+        {
+            snapshot.StatusMessage = isElevated
+                ? "CPU package temperature unavailable (LibreHardwareMonitor AMD SMU returned 0; Windows thermal zone also unavailable)."
+                : "Temperature sensors usually require administrator rights.";
+        }
+    }
+
+    /// <summary>
+    /// LHM often exposes stub zeros for unsupported AMD SMU reads (Tctl/Tdie = 0 °C,
+    /// per-core SMU power = 0 W). Those must not become summary values or list noise.
+    /// </summary>
+    public static bool IsPlausibleTemperature(double value) => value is > 1 and < 125;
+
+    public static bool IsPlausiblePower(double value) => value > 0.05;
+
+    public static bool IsDisplayableSensor(SensorKind kind, double value) => kind switch
+    {
+        SensorKind.Temperature => IsPlausibleTemperature(value),
+        SensorKind.Power => IsPlausiblePower(value),
+        SensorKind.Fan => value > 0,
+        SensorKind.Clock => value > 0,
+        _ => true
+    };
+
     private static bool IsPreferredCpuTemp(string name) =>
         name.Contains("Package", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("Tctl", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("Tdie", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("CCD", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("CPU", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsMotherboardCpuTempName(string name) =>
+        name.Equals("CPU", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("CPU", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("Tctl", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("Tdie", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("Package", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsPreferredGpuTemp(string name) =>
+        name.Contains("GPU Core", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("GPU", StringComparison.OrdinalIgnoreCase) ||
+        (name.Contains("Core", StringComparison.OrdinalIgnoreCase)
+         && !name.Contains("Memory", StringComparison.OrdinalIgnoreCase)
+         && !name.Contains("Hot Spot", StringComparison.OrdinalIgnoreCase)
+         && !name.Contains("VR", StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsAcceptableGpuTemp(string name) =>
+        name.Contains("Hot Spot", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("Edge", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("VR SoC", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("Temperature", StringComparison.OrdinalIgnoreCase) ||
+        !name.Contains("Memory", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsPreferredGpuLoad(string name) =>
+        name.Equals("GPU Core", StringComparison.OrdinalIgnoreCase) ||
+        (name.Contains("Core", StringComparison.OrdinalIgnoreCase)
+         && !name.Contains("Memory", StringComparison.OrdinalIgnoreCase)
+         && !name.StartsWith("D3D", StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsFallbackGpuLoad(string name) =>
+        name.Equals("D3D 3D", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("GPU", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("3D", StringComparison.OrdinalIgnoreCase);
 
     private static SensorKind? MapKind(SensorType type) => type switch
     {
@@ -306,7 +507,18 @@ public sealed class LibreHardwareMonitorService : IHardwareMonitorService
             {
                 _computer = null;
             }
+
+            if (_osThermal is IDisposable disposableThermal)
+            {
+                disposableThermal.Dispose();
+            }
         }
+    }
+
+    private sealed class CaptureState
+    {
+        public HardwareSnapshot Snapshot { get; } = new();
+        public int GpuPreference { get; set; }
     }
 
     private sealed class UpdateVisitor : IVisitor

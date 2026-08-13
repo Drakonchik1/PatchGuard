@@ -3,21 +3,35 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PatchGuard.Models;
+using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Hardware;
+using PatchGuard.Services.History;
 using PatchGuard.Services.Platform;
 
 namespace PatchGuard.ViewModels;
 
 public partial class MonitorViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
+    private static readonly TimeSpan SnapshotInterval = TimeSpan.FromSeconds(10);
+
     private readonly IHardwareMonitorService _hardware;
     private readonly IAdminElevationService _elevation;
+    private readonly ISensorHistoryService _sensorHistory;
+    private readonly IAlertRuleEngine _alertRules;
     private readonly DispatcherTimer _timer;
+    private DateTime _lastSnapshotUtc = DateTime.MinValue;
+    private int _persistGeneration;
 
-    public MonitorViewModel(IHardwareMonitorService hardware, IAdminElevationService elevation)
+    public MonitorViewModel(
+        IHardwareMonitorService hardware,
+        IAdminElevationService elevation,
+        ISensorHistoryService sensorHistory,
+        IAlertRuleEngine alertRules)
     {
         _hardware = hardware;
         _elevation = elevation;
+        _sensorHistory = sensorHistory;
+        _alertRules = alertRules;
         IsElevated = elevation.IsElevated;
 
         // 2s strikes a balance between live feedback and a low CPU footprint.
@@ -27,10 +41,30 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
 
     public ObservableCollection<SensorReading> Sensors { get; } = [];
 
-    [ObservableProperty] private bool _isElevated;
-    [ObservableProperty] private bool _sensorsLimited;
-    [ObservableProperty] private bool _monitorUnavailable;
-    [ObservableProperty] private string? _statusMessage;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAdminElevationHint))]
+    [NotifyPropertyChangedFor(nameof(ShowSensorStatusHint))]
+    private bool _isElevated;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAdminElevationHint))]
+    [NotifyPropertyChangedFor(nameof(ShowSensorStatusHint))]
+    private bool _sensorsLimited;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSensorStatusHint))]
+    private bool _monitorUnavailable;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSensorStatusHint))]
+    private string? _statusMessage;
+
+    public bool ShowAdminElevationHint => SensorsLimited && !IsElevated;
+
+    public bool ShowSensorStatusHint =>
+        !MonitorUnavailable
+        && !ShowAdminElevationHint
+        && !string.IsNullOrWhiteSpace(StatusMessage);
 
     [ObservableProperty] private string _cpuName = "CPU";
     [ObservableProperty] private string _cpuTempText = "n/a";
@@ -49,6 +83,9 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
     [ObservableProperty] private string _ramText = "n/a";
     [ObservableProperty] private double _ramPercent;
     [ObservableProperty] private string _ramDetailText = string.Empty;
+
+    [ObservableProperty] private bool _hasActiveAlerts;
+    [ObservableProperty] private string _alertSummaryText = string.Empty;
 
     public void OnNavigatedTo()
     {
@@ -104,6 +141,53 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         }
 
         UpdateSensors(s.Sensors);
+        ApplyAlertSummary(_alertRules.Evaluate(s));
+        MaybePersistSnapshot(s);
+    }
+
+    private void ApplyAlertSummary(IReadOnlyList<Alert> alerts)
+    {
+        HasActiveAlerts = alerts.Count > 0;
+        if (!HasActiveAlerts)
+        {
+            AlertSummaryText = string.Empty;
+            return;
+        }
+
+        var highest = alerts.Max(a => a.Severity);
+        AlertSummaryText = $"{alerts.Count} active · {highest}";
+    }
+
+    private void MaybePersistSnapshot(HardwareSnapshot snapshot)
+    {
+        if (snapshot.MonitorUnavailable)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (now - _lastSnapshotUtc < SnapshotInterval)
+        {
+            return;
+        }
+
+        _lastSnapshotUtc = now;
+        var generation = Interlocked.Increment(ref _persistGeneration);
+        _ = PersistSnapshotAsync(snapshot, generation);
+    }
+
+    private async Task PersistSnapshotAsync(HardwareSnapshot snapshot, int generation)
+    {
+        try
+        {
+            await _sensorHistory.SaveSnapshotAsync(snapshot);
+        }
+        catch
+        {
+            // History failures must not break the live monitor loop.
+        }
+
+        _ = generation;
     }
 
     private void UpdateSensors(IReadOnlyList<SensorReading> readings)

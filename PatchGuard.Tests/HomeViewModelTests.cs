@@ -1,5 +1,6 @@
 using PatchGuard.Models;
 using PatchGuard.Services;
+using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.History;
 using PatchGuard.Services.Navigation;
@@ -71,6 +72,26 @@ public sealed class HomeViewModelTests
         Assert.Equal(
             "Scan history is temporarily unavailable.",
             viewModel.DashboardErrorMessage);
+    }
+
+    [Fact]
+    public async Task RefreshBuildsAlertSummaryFromSyntheticSpike()
+    {
+        var viewModel = CreateViewModel(
+            new FakeHistoryService([]),
+            new FakeHardwareMonitorService(new HardwareSnapshot
+            {
+                CpuTemperatureC = 97,
+                CpuLoadPercent = 20,
+                RamUsedGb = 8,
+                RamTotalGb = 16
+            }));
+
+        await viewModel.RefreshDashboardAsync();
+
+        Assert.True(viewModel.HasActiveAlerts);
+        Assert.Contains("Critical", viewModel.AlertSummaryText, StringComparison.Ordinal);
+        Assert.Contains("CPU temperature", viewModel.AlertDetailText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -149,7 +170,8 @@ public sealed class HomeViewModelTests
             navigation ?? new RecordingNavigationService(),
             new ScanSessionState(),
             history,
-            hardware);
+            hardware,
+            new AlertRuleEngine());
 
     private sealed class FakeHistoryService(IReadOnlyList<ScanHistoryEntry> scans) : IScanHistoryService
     {

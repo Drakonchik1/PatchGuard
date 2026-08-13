@@ -48,7 +48,7 @@ AI competence phases (RAG, Ollama, Semantic Kernel, ML, Azure) live in [AI_ROADM
 - Guided-fix pipeline: preview → confirm → execute → verify → record
 - No auto-run of privileged or destructive actions
 
-**Current gap:** `AlertsViewModel` is a stub; `PlannedFeatureView` still used for Alerts.
+**Current gap:** `AlertsViewModel` is still a stub (Sprint 3). Sensor history + `AlertRuleEngine` + dashboard alert summary shipped in Sprint 2.
 
 ## Phase 4: Optimization expansion (Sprint 8)
 

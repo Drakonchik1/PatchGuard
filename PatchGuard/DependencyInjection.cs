@@ -6,6 +6,7 @@ using PatchGuard.Data;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
 using PatchGuard.Services.Ai.Tools;
+using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Diagnostics;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.Health;
@@ -94,6 +95,7 @@ public static class DependencyInjection
 
         // Platform + hardware services
         services.AddSingleton<IAdminElevationService, AdminElevationService>();
+        services.AddSingleton<IOsThermalTemperatureSource, WindowsThermalZoneTemperatureSource>();
         services.AddSingleton<IHardwareMonitorService, LibreHardwareMonitorService>();
         services.AddSingleton<IFpsCaptureService, PresentMonFpsCaptureService>();
 
@@ -125,6 +127,8 @@ public static class DependencyInjection
         services.AddSingleton<IAiCouncilService, AiCouncilService>();
         services.AddSingleton<IScanHistoryService, ScanHistoryService>();
         services.AddSingleton<IPerformanceHistoryService, PerformanceHistoryService>();
+        services.AddSingleton<ISensorHistoryService, SensorHistoryService>();
+        services.AddSingleton<IAlertRuleEngine, AlertRuleEngine>();
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<DiagnoseViewModel>();

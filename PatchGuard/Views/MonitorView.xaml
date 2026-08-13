@@ -43,7 +43,7 @@
 
                 <!-- Admin hint -->
                 <Border Style="{StaticResource CardBorder}" BorderBrush="{StaticResource WarnBrush}"
-                        Visibility="{Binding SensorsLimited, Converter={StaticResource BoolVis}}">
+                        Visibility="{Binding ShowAdminElevationHint, Converter={StaticResource BoolVis}}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -57,6 +57,16 @@
                         <Button Grid.Column="1" Content="Run as admin" VerticalAlignment="Center"
                                 Style="{StaticResource PrimaryButtonInteractive}" Command="{Binding RunAsAdminCommand}"/>
                     </Grid>
+                </Border>
+
+                <!-- AMD SMU / driver limitation (already elevated) -->
+                <Border Style="{StaticResource CardBorder}" BorderBrush="{StaticResource WarnBrush}"
+                        Visibility="{Binding ShowSensorStatusHint, Converter={StaticResource BoolVis}}"
+                        Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Some sensors are unavailable" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource SubtleText}" TextWrapping="Wrap"/>
+                    </StackPanel>
                 </Border>
 
                 <!-- Big tiles -->

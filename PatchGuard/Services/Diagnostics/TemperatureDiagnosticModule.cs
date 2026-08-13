@@ -50,14 +50,22 @@ public sealed class TemperatureDiagnosticModule : IDiagnosticModule
             {
                 ModuleName = Name,
                 Title = "No temperature readings available",
-                Details = snapshot.SensorsLimited
-                    ? "Temperature sensors usually require administrator rights. Use 'Run as admin' on the Monitor screen for full readings."
-                    : "No temperature sensors were exposed by this hardware.",
+                Details = !string.IsNullOrWhiteSpace(snapshot.StatusMessage)
+                    ? snapshot.StatusMessage
+                    : snapshot.SensorsLimited
+                        ? "Temperature sensors usually require administrator rights. Use 'Run as admin' on the Monitor screen for full readings."
+                        : "No temperature sensors were exposed by this hardware.",
                 Severity = FindingSeverity.Info,
-                Evidence = snapshot.SensorsLimited
-                    ? "No CPU or GPU temperature was returned while sensor access was limited; administrator elevation may expose readings."
-                    : "The hardware monitor returned no CPU or GPU temperature and did not report limited access.",
-                Recommendation = snapshot.SensorsLimited ? "Relaunch PatchGuard as administrator to read temperatures." : null,
+                Evidence = !string.IsNullOrWhiteSpace(snapshot.StatusMessage)
+                    ? snapshot.StatusMessage
+                    : snapshot.SensorsLimited
+                        ? "No CPU or GPU temperature was returned while sensor access was limited; administrator elevation may expose readings."
+                        : "The hardware monitor returned no CPU or GPU temperature and did not report limited access.",
+                Recommendation = snapshot.SensorsLimited
+                    ? "Relaunch PatchGuard as administrator to read temperatures."
+                    : snapshot.CpuTemperatureC is null
+                        ? "If you are on newer AMD Ryzen, install/repair the PawnIO driver used by LibreHardwareMonitor."
+                        : null,
                 ActionState = snapshot.SensorsLimited
                     ? FindingActionState.Recommended
                     : FindingActionState.Unavailable,

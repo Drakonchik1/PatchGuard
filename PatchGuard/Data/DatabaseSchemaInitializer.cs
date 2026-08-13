@@ -11,6 +11,7 @@ public sealed class DatabaseSchemaInitializer
 {
     private const string SnapshotMigration = "20260712_HealthScoreSnapshots";
     private const string CouncilEvaluationMigration = "20260810_CouncilEvaluationRecords";
+    private const string SensorSnapshotMigration = "20260813_SensorSnapshotRecords";
     private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
     private readonly IHealthScorePolicy _healthScorePolicy;
 
@@ -75,6 +76,18 @@ public sealed class DatabaseSchemaInitializer
             );
             CREATE INDEX IF NOT EXISTS "IX_CouncilEvaluations_EvaluatedAt" ON "CouncilEvaluations" ("EvaluatedAt");
 
+            CREATE TABLE IF NOT EXISTS "SensorSnapshots" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_SensorSnapshots" PRIMARY KEY AUTOINCREMENT,
+                "CapturedAt" TEXT NOT NULL,
+                "CpuTemperatureC" REAL NULL,
+                "CpuLoadPercent" REAL NULL,
+                "GpuTemperatureC" REAL NULL,
+                "GpuLoadPercent" REAL NULL,
+                "RamLoadPercent" REAL NULL,
+                "RamUsedGb" REAL NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_SensorSnapshots_CapturedAt" ON "SensorSnapshots" ("CapturedAt");
+
             CREATE TABLE IF NOT EXISTS "SchemaMigrations" (
                 "MigrationId" TEXT NOT NULL CONSTRAINT "PK_SchemaMigrations" PRIMARY KEY,
                 "AppliedAt" TEXT NOT NULL
@@ -118,6 +131,12 @@ public sealed class DatabaseSchemaInitializer
             $"""
              INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
              VALUES ({CouncilEvaluationMigration}, {DateTime.UtcNow});
+             """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
+             VALUES ({SensorSnapshotMigration}, {DateTime.UtcNow});
              """,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);

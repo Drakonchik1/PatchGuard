@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PatchGuard.Models;
 using PatchGuard.Services;
+using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.History;
 using PatchGuard.Services.Navigation;
@@ -15,6 +16,7 @@ public partial class HomeViewModel : ObservableObject, INavigationAware, INaviga
     private readonly ScanSessionState _session;
     private readonly IScanHistoryService _history;
     private readonly IHardwareMonitorService _hardware;
+    private readonly IAlertRuleEngine _alertRules;
     private CancellationTokenSource? _refreshCts;
     private int _refreshGeneration;
 
@@ -22,12 +24,14 @@ public partial class HomeViewModel : ObservableObject, INavigationAware, INaviga
         INavigationService navigation,
         ScanSessionState session,
         IScanHistoryService history,
-        IHardwareMonitorService hardware)
+        IHardwareMonitorService hardware,
+        IAlertRuleEngine alertRules)
     {
         _navigation = navigation;
         _session = session;
         _history = history;
         _hardware = hardware;
+        _alertRules = alertRules;
 
         Scenarios = new ObservableCollection<ScenarioOption>(ScanScenarioWorkflow.CreateOptions());
     }
@@ -61,6 +65,15 @@ public partial class HomeViewModel : ObservableObject, INavigationAware, INaviga
 
     [ObservableProperty]
     private string _memoryText = "Unavailable";
+
+    [ObservableProperty]
+    private bool _hasActiveAlerts;
+
+    [ObservableProperty]
+    private string _alertSummaryText = "No active alerts";
+
+    [ObservableProperty]
+    private string _alertDetailText = "Open Live Monitor to capture sensor history.";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDashboardError))]
@@ -163,6 +176,26 @@ public partial class HomeViewModel : ObservableObject, INavigationAware, INaviga
         MemoryText = snapshot is { RamUsedGb: { } used, RamTotalGb: { } total }
             ? $"{used:F1} / {total:F1} GB"
             : "Unavailable";
+
+        ApplyAlertSummary(_alertRules.Evaluate(snapshot));
+    }
+
+    private void ApplyAlertSummary(IReadOnlyList<Alert> alerts)
+    {
+        HasActiveAlerts = alerts.Count > 0;
+        if (!HasActiveAlerts)
+        {
+            AlertSummaryText = "No active alerts";
+            AlertDetailText = "Thresholds look healthy on the latest snapshot.";
+            return;
+        }
+
+        var highest = alerts.Max(a => a.Severity);
+        AlertSummaryText = $"{alerts.Count} · {highest}";
+        AlertDetailText = alerts
+            .OrderByDescending(a => a.Severity)
+            .First()
+            .Message;
     }
 
     [RelayCommand]

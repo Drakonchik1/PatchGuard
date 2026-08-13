@@ -14,6 +14,7 @@ public sealed class PatchGuardDbContext : DbContext
     public DbSet<FpsCaptureRecord> FpsCaptures => Set<FpsCaptureRecord>();
     public DbSet<OptimizationRunRecord> OptimizationRuns => Set<OptimizationRunRecord>();
     public DbSet<CouncilEvaluationRecord> CouncilEvaluations => Set<CouncilEvaluationRecord>();
+    public DbSet<SensorSnapshotRecord> SensorSnapshots => Set<SensorSnapshotRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,12 @@ public sealed class PatchGuardDbContext : DbContext
             entity.Property(e => e.Scenario).HasMaxLength(64);
             entity.Property(e => e.Source).HasMaxLength(32);
             entity.HasIndex(e => e.EvaluatedAt);
+        });
+
+        modelBuilder.Entity<SensorSnapshotRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.CapturedAt);
         });
     }
 

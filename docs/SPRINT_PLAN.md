@@ -30,7 +30,7 @@
 | Sprint | Name | Status | Depends on |
 |--------|------|--------|------------|
 | 1 | Stabilize baseline + CI | ✅ Done | — |
-| 2 | Sensor history + alert engine | ⬜ Not started | Sprint 1 |
+| 2 | Sensor history + alert engine | ✅ Done | Sprint 1 |
 | 3 | Guided fixes + alerts UI | ⬜ Not started | Sprint 2 |
 | 4 | Classic ML (Microsoft.ML) | ⬜ Not started | Sprint 2 |
 | 5 | AI polish (RAG, agent, settings) | ⬜ Not started | Sprint 4 |
@@ -123,11 +123,11 @@ Run dotnet test before finishing. Mark Sprint 1 ✅ in docs/SPRINT_PLAN.md when 
 
 ### Definition of Done
 
-- [ ] Sensor snapshots persist to SQLite and survive app restart
-- [ ] Inject synthetic high-temp snapshot → `AlertRuleEngine` emits alert
-- [ ] Home dashboard shows alert summary when active alerts exist
-- [ ] Unit tests for history + rules pass
-- [ ] No PII in sensor records (numbers only)
+- [x] Sensor snapshots persist to SQLite and survive app restart
+- [x] Inject synthetic high-temp snapshot → `AlertRuleEngine` emits alert
+- [x] Home dashboard shows alert summary when active alerts exist
+- [x] Unit tests for history + rules pass
+- [x] No PII in sensor records (numbers only)
 
 ### Verify
 

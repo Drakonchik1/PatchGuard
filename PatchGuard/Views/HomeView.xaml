@@ -54,6 +54,12 @@
                                                 SupportingText="{Binding HardwareStatusText}"
                                                 StatusBrush="{StaticResource GoodBrush}"
                                                 AutomationProperties.Name="Memory snapshot summary"/>
+                    <controls:StatusSummaryCard Width="220"
+                                                Caption="ALERTS"
+                                                Value="{Binding AlertSummaryText}"
+                                                SupportingText="{Binding AlertDetailText}"
+                                                StatusBrush="{StaticResource CriticalBrush}"
+                                                AutomationProperties.Name="Alert summary"/>
                 </WrapPanel>
 
                 <Border Style="{StaticResource DashboardPanel}"
