@@ -29,8 +29,8 @@ public sealed class MainViewModelTests
         new()
         {
             new ScanViewModel(null!, null!, null!, null!),
-            new FindingsViewModel(null!, null!, new HealthScorePolicy()),
-            new GuideViewModel(null!, null!, null!)
+            new FindingsViewModel(null!, null!, new HealthScorePolicy(), new StubGuidedFixPlanService(), new StubUserConfirmationService()),
+            new GuideViewModel(null!, null!, null!, new StubGuidedFixPlanService(), new StubUserConfirmationService())
         };
 
     [Theory]
@@ -52,7 +52,7 @@ public sealed class MainViewModelTests
     [Theory]
     [InlineData("Alerts", typeof(AlertsViewModel))]
     [InlineData("Settings", typeof(SettingsViewModel))]
-    public void PlannedSidebarDestinationsNavigateToExactPlaceholder(string section, Type expectedType)
+    public void SidebarDestinationsNavigateToExactViewModel(string section, Type expectedType)
     {
         var navigation = new RecordingNavigationService();
         var viewModel = new MainViewModel(new NavigationServiceProvider(navigation));

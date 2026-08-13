@@ -51,7 +51,9 @@ public sealed class GuidePrivacyUiTests
         var viewModel = new GuideViewModel(
             new NoOpNavigationService(),
             session,
-            new RecordingCouncilService());
+            new RecordingCouncilService(),
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.OnNavigatedTo();
 
@@ -65,7 +67,9 @@ public sealed class GuidePrivacyUiTests
         new(
             new NoOpNavigationService(),
             new ScanSessionState { SelectedScenario = ScanScenario.QuickHealthCheck },
-            council);
+            council,
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
     private sealed class RecordingCouncilService : IAiCouncilService
     {

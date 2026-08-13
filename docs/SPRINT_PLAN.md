@@ -31,7 +31,7 @@
 |--------|------|--------|------------|
 | 1 | Stabilize baseline + CI | ✅ Done | — |
 | 2 | Sensor history + alert engine | ✅ Done | Sprint 1 |
-| 3 | Guided fixes + alerts UI | ⬜ Not started | Sprint 2 |
+| 3 | Guided fixes + alerts UI | ✅ Done | Sprint 2 |
 | 4 | Classic ML (Microsoft.ML) | ⬜ Not started | Sprint 2 |
 | 5 | AI polish (RAG, agent, settings) | ⬜ Not started | Sprint 4 |
 | 6 | Cloud adapters (Azure + secrets) | ⬜ Not started | Sprint 5 |
@@ -191,11 +191,11 @@ Run dotnet test before finishing. Mark Sprint 2 ✅ in docs/SPRINT_PLAN.md.
 
 ### Definition of Done
 
-- [ ] Alerts page shows real alerts (not placeholder message)
-- [ ] One guided fix works end-to-end: preview → confirm → verify → SQLite record
-- [ ] No privileged/destructive action runs without explicit confirm
-- [ ] `AlertsViewModel` stub message removed
-- [ ] Tests cover safety gate and cancellation
+- [x] Alerts page shows real alerts (not placeholder message)
+- [x] One guided fix works end-to-end: preview → confirm → verify → SQLite record
+- [x] No privileged/destructive action runs without explicit confirm
+- [x] `AlertsViewModel` stub message removed
+- [x] Tests cover safety gate and cancellation
 
 ### Verify
 

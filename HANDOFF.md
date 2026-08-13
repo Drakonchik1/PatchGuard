@@ -10,7 +10,8 @@
 ### Product (UX)
 - Phase 1 UX shell: sidebar, design system, dashboard, reusable controls.
 - Phase 2 diagnostic journey: step indicator, unified scoring, actionable findings, optional AI with consent + provenance.
-- Sprint 2: sensor history (SQLite) + threshold alert engine; dashboard alert summary card (full Alerts UI = Sprint 3).
+- Sprint 2: sensor history (SQLite) + threshold alert engine; dashboard alert summary.
+- Sprint 3: real Alerts UI, Monitor inline alert banner, guided-fix pipeline (preview → confirm → execute → verify → record).
 
 ### AI competencies
 - Phase 0: golden eval harness (**10** fixtures), `CouncilEvaluator`, `CouncilEvaluationRecord`, baseline docs.
@@ -29,6 +30,12 @@
 - `IAlertRuleEngine` default CPU/GPU temp + load thresholds
 - Home dashboard alert summary (count + highest severity)
 - AMD GPU mapping fix: prefer discrete AMD/NVIDIA over Intel iGPU; ADL Core/Hot Spot; D3D load fallback; warm-up Update
+
+### Sprint 3 (done)
+- `AlertsView` / `AlertsViewModel` (active + recently resolved)
+- Monitor threshold alert banner
+- `IGuidedFixPlanService` safety gate; `GuidedFixRuns` SQLite history
+- “Run safe fix” from Findings / Guide (optimizer steps + `LaunchUriPolicy` only; no Explorer restart)
 
 ### Docs & security
 - `docs/SPRINT_PLAN.md`, `docs/AI_ROADMAP.md`, `docs/UX_ROADMAP.md`, `docs/OLLAMA_SETUP.md`
@@ -51,7 +58,7 @@ Model switch: `docs/OLLAMA_SETUP.md`.
 |--------|-------|--------|
 | 1 | CI + golden×10 + `AI_ARCHITECTURE.md` | ✅ |
 | 2 | Sensor history + alert engine | ✅ |
-| 3 | Guided fixes + alerts UI | ⬜ |
+| 3 | Guided fixes + alerts UI | ✅ |
 | 4 | Classic ML (inference-only) | ⬜ |
 | 5 | AI polish (settings, trace, hybrid RAG) | ⬜ |
 | 6 | Azure + DPAPI secrets | ⬜ |
@@ -62,13 +69,12 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 
 ## Next sprint
 
-**Sprint 3** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) (Guided fixes + alerts UI).
+**Sprint 4** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) (Classic ML / Microsoft.ML).
 
 ## Remaining gaps (by sprint)
 
 | Gap | Sprint |
 |-----|--------|
-| Full Alerts UI + guided fixes | 3 |
 | Microsoft.ML anomaly (no training UI) | 4 |
 | Settings provider radio, agent trace, hybrid RAG | 5 |
 | Golden 10 → 15–20, CI threshold gate | 5, 7 |
@@ -84,6 +90,8 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 | Sprint plan | `docs/SPRINT_PLAN.md` |
 | Sensor history | `PatchGuard/Services/History/SensorHistoryService.cs` |
 | Alert rules | `PatchGuard/Services/Alerts/AlertRuleEngine.cs` |
+| Alerts UI | `PatchGuard/ViewModels/AlertsViewModel.cs`, `Views/AlertsView.xaml` |
+| Guided fixes | `PatchGuard/Services/Fixes/GuidedFixPlanService.cs` |
 | AI architecture | `docs/AI_ARCHITECTURE.md` |
 | Eval results | `docs/AI_EVAL_RESULTS.md` |
 | Chat providers | `PatchGuard/Services/Ai/IChatCompletionProvider.cs`, `OllamaChatProvider.cs`, `OpenAiChatClient.cs` |

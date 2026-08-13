@@ -15,6 +15,7 @@ public sealed class PatchGuardDbContext : DbContext
     public DbSet<OptimizationRunRecord> OptimizationRuns => Set<OptimizationRunRecord>();
     public DbSet<CouncilEvaluationRecord> CouncilEvaluations => Set<CouncilEvaluationRecord>();
     public DbSet<SensorSnapshotRecord> SensorSnapshots => Set<SensorSnapshotRecord>();
+    public DbSet<GuidedFixRunRecord> GuidedFixRuns => Set<GuidedFixRunRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +53,17 @@ public sealed class PatchGuardDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.CapturedAt);
+        });
+
+        modelBuilder.Entity<GuidedFixRunRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Source).HasMaxLength(128);
+            entity.Property(e => e.PlanTitle).HasMaxLength(256);
+            entity.Property(e => e.Outcome).HasMaxLength(64);
+            entity.Property(e => e.LinkedScanScenario).HasMaxLength(64);
+            entity.Property(e => e.Summary).HasMaxLength(512);
+            entity.HasIndex(e => e.RanAt);
         });
     }
 

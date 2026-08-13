@@ -5,25 +5,47 @@ using CommunityToolkit.Mvvm.Input;
 using PatchGuard.Models;
 using PatchGuard.Services;
 using PatchGuard.Services.Ai;
+using PatchGuard.Services.Fixes;
 using PatchGuard.Services.Navigation;
+using PatchGuard.Services.Platform;
 
 namespace PatchGuard.ViewModels;
+
+public sealed class FixStepItemViewModel
+{
+    public required FixStep Step { get; init; }
+    public required bool CanRunSafeFix { get; init; }
+
+    public int Order => Step.Order;
+    public string Title => Step.Title;
+    public string Instructions => Step.Instructions;
+    public string? CopyText => Step.CopyText;
+    public string? LinkUrl => Step.LinkUrl;
+    public string? WhyThisMatters => Step.WhyThisMatters;
+    public string? Evidence => Step.Evidence;
+}
 
 public partial class GuideViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
     private readonly IAiCouncilService _aiCouncil;
+    private readonly IGuidedFixPlanService _fixPlans;
+    private readonly IUserConfirmationService _confirmation;
     private CancellationTokenSource? _councilCts;
 
     public GuideViewModel(
         INavigationService navigation,
         ScanSessionState session,
-        IAiCouncilService aiCouncil)
+        IAiCouncilService aiCouncil,
+        IGuidedFixPlanService fixPlans,
+        IUserConfirmationService confirmation)
     {
         _navigation = navigation;
         _session = session;
         _aiCouncil = aiCouncil;
+        _fixPlans = fixPlans;
+        _confirmation = confirmation;
 
         AgentPanels =
         [
@@ -44,7 +66,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     public ObservableCollection<AgentPanelState> AgentPanels { get; }
     public ObservableCollection<CouncilPhaseStep> PhaseSteps { get; }
     public ObservableCollection<CouncilMessage> CouncilMessages { get; } = [];
-    public ObservableCollection<FixStep> FixSteps { get; } = [];
+    public ObservableCollection<FixStepItemViewModel> FixSteps { get; } = [];
     public ObservableCollection<WebReference> WebReferences { get; } = [];
     public ObservableCollection<KnowledgeReference> KnowledgeReferences { get; } = [];
     public ObservableCollection<ScanMetric> ScanMetrics { get; } = [];
@@ -73,6 +95,12 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
 
     [ObservableProperty]
     private string? _errorMessage;
+
+    [ObservableProperty]
+    private bool _isFixRunning;
+
+    [ObservableProperty]
+    private string? _fixStatusMessage;
 
     public void OnNavigatedTo()
     {
@@ -172,6 +200,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         Summary = string.Empty;
         HealthScore = 0;
         ErrorMessage = null;
+        FixStatusMessage = null;
 
         foreach (var step in PhaseSteps)
         {
@@ -297,10 +326,15 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
             CouncilMessages.Add(message);
         }
 
+        var scenario = _session.SelectedScenario?.GetTitle();
         FixSteps.Clear();
         foreach (var step in guide.Steps.OrderBy(s => s.Order))
         {
-            FixSteps.Add(step);
+            FixSteps.Add(new FixStepItemViewModel
+            {
+                Step = step,
+                CanRunSafeFix = _fixPlans.TryBuildFromFixStep(step, scenario) is not null
+            });
         }
 
         WebReferences.Clear();
@@ -315,6 +349,56 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
             KnowledgeReferences.Add(reference);
         }
     }
+
+    [RelayCommand(CanExecute = nameof(CanRunFix))]
+    private async Task RunSafeFixAsync(FixStepItemViewModel? item)
+    {
+        if (item is null || !item.CanRunSafeFix)
+        {
+            return;
+        }
+
+        var scenario = _session.SelectedScenario?.GetTitle();
+        var plan = _fixPlans.TryBuildFromFixStep(item.Step, scenario);
+        if (plan is null)
+        {
+            FixStatusMessage = "No safe automated fix is available for this guide step.";
+            return;
+        }
+
+        var preview = _fixPlans.Preview(plan);
+        var confirmMessage =
+            $"{preview.Summary}\n\n" +
+            string.Join("\n", preview.StepSummaries.Select(s => "• " + s)) +
+            "\n\nRun these safe steps now?";
+
+        if (!_confirmation.Confirm("Confirm guided fix", confirmMessage))
+        {
+            FixStatusMessage = "Fix cancelled. No system changes were made.";
+            return;
+        }
+
+        IsFixRunning = true;
+        RunSafeFixCommand.NotifyCanExecuteChanged();
+        FixStatusMessage = "Running safe fix…";
+        try
+        {
+            var result = await _fixPlans.ExecuteAsync(plan, GuidedFixConfirmation.ConfirmNow());
+            FixStatusMessage = result.Summary;
+        }
+        catch (Exception ex)
+        {
+            FixStatusMessage = $"Guided fix failed: {ex.Message}";
+        }
+        finally
+        {
+            IsFixRunning = false;
+            RunSafeFixCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanRunFix(FixStepItemViewModel? item) =>
+        !IsFixRunning && !IsCouncilRunning && item is { CanRunSafeFix: true };
 
     [RelayCommand]
     private void OpenLink(string? url)

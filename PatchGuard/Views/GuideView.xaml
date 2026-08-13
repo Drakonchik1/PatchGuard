@@ -233,7 +233,7 @@
                             <TextBlock Text="Action plan" Style="{StaticResource SectionHeader}"/>
                             <ItemsControl ItemsSource="{Binding FixSteps}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type models:FixStep}">
+                                    <DataTemplate DataType="{x:Type vm:FixStepItemViewModel}">
                                         <Grid Margin="0,0,0,24">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="36"/>
@@ -255,6 +255,11 @@
                                                            Foreground="{StaticResource TextMutedBrush}"
                                                            Visibility="{Binding Evidence, Converter={StaticResource NullVis}}"/>
                                                 <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                                    <Button Content="Run safe fix" Style="{StaticResource PrimaryButtonInteractive}" Margin="0,0,12,0"
+                                                            Command="{Binding DataContext.RunSafeFixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Visibility="{Binding CanRunSafeFix, Converter={StaticResource BoolVis}}"
+                                                            AutomationProperties.Name="Run safe guided fix for this guide step"/>
                                                     <Button Content="Open" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0"
                                                             Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding LinkUrl}"
@@ -269,6 +274,11 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Text="{Binding FixStatusMessage}"
+                                       Style="{StaticResource SubtleText}"
+                                       Margin="0,8,0,0"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding FixStatusMessage, Converter={StaticResource NullVis}}"/>
                         </StackPanel>
                     </Border>
 

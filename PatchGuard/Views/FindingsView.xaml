@@ -4,6 +4,7 @@
              xmlns:controls="clr-namespace:PatchGuard.Controls"
              xmlns:conv="clr-namespace:PatchGuard.Converters"
              xmlns:models="clr-namespace:PatchGuard.Models"
+             xmlns:vm="clr-namespace:PatchGuard.ViewModels"
              mc:Ignorable="d"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -12,6 +13,7 @@
         <conv:SeverityToBrushConverter x:Key="SeverityBrush"/>
         <conv:SeverityToBarBrushConverter x:Key="BarBrush"/>
         <conv:HealthScoreBrushConverter x:Key="HealthScoreBrush"/>
+        <conv:NullToVisibilityConverter x:Key="NullVis"/>
         <BooleanToVisibilityConverter x:Key="BoolVis"/>
     </UserControl.Resources>
 
@@ -145,13 +147,14 @@
                            Margin="0,0,0,12"/>
                 <ItemsControl ItemsSource="{Binding Findings}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type models:Finding}">
+                        <DataTemplate DataType="{x:Type vm:FindingItemViewModel}">
                             <Border Style="{StaticResource CardBorder}"
                                     BorderThickness="4,0,0,0"
                                     BorderBrush="{Binding Severity, Converter={StaticResource SeverityBrush}}"
                                     AutomationProperties.Name="{Binding Title}">
                                 <Grid>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -220,11 +223,27 @@
                                             </WrapPanel>
                                         </StackPanel>
                                     </Expander>
+
+                                    <Button Grid.Row="3"
+                                            Content="Run safe fix"
+                                            Style="{StaticResource PrimaryButtonInteractive}"
+                                            HorizontalAlignment="Left"
+                                            Margin="0,14,0,0"
+                                            Command="{Binding DataContext.RunSafeFixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding CanRunSafeFix, Converter={StaticResource BoolVis}}"
+                                            AutomationProperties.Name="Run safe guided fix for this finding"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <TextBlock Text="{Binding FixStatusMessage}"
+                           Style="{StaticResource SubtleText}"
+                           Margin="0,16,0,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding FixStatusMessage, Converter={StaticResource NullVis}}"/>
             </StackPanel>
         </ScrollViewer>
 

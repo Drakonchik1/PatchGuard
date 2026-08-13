@@ -52,7 +52,12 @@ public sealed class Phase2JourneyTests
         var policy = new HealthScorePolicy();
         var session = new ScanSessionState { SelectedScenario = ScanScenario.QuickHealthCheck };
         session.Findings.AddRange(findings);
-        var current = new FindingsViewModel(new RecordingNavigationService(), session, policy);
+        var current = new FindingsViewModel(
+            new RecordingNavigationService(),
+            session,
+            policy,
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
         current.OnNavigatedTo();
 
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -76,7 +81,9 @@ public sealed class Phase2JourneyTests
         var viewModel = new GuideViewModel(
             new RecordingNavigationService(),
             new ScanSessionState { SelectedScenario = ScanScenario.QuickHealthCheck },
-            council);
+            council,
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.OnNavigatedTo();
         await Task.Delay(50);
@@ -92,7 +99,9 @@ public sealed class Phase2JourneyTests
         var viewModel = new GuideViewModel(
             new RecordingNavigationService(),
             new ScanSessionState { SelectedScenario = ScanScenario.QuickHealthCheck },
-            council);
+            council,
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.RunCouncilCommand.Execute(null);
         await council.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -107,7 +116,12 @@ public sealed class Phase2JourneyTests
     {
         var council = new RecordingCouncilService { WaitForRelease = true };
         var session = new ScanSessionState { SelectedScenario = ScanScenario.QuickHealthCheck };
-        var viewModel = new GuideViewModel(new RecordingNavigationService(), session, council);
+        var viewModel = new GuideViewModel(
+            new RecordingNavigationService(),
+            session,
+            council,
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.RunCouncilCommand.Execute(null);
         await council.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -135,7 +149,9 @@ public sealed class Phase2JourneyTests
         var viewModel = new GuideViewModel(
             new RecordingNavigationService(),
             session,
-            new RecordingCouncilService());
+            new RecordingCouncilService(),
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.OnNavigatedTo();
 
@@ -160,7 +176,9 @@ public sealed class Phase2JourneyTests
         var viewModel = new GuideViewModel(
             new RecordingNavigationService(),
             session,
-            new RecordingCouncilService());
+            new RecordingCouncilService(),
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.OnNavigatedTo();
 
@@ -227,7 +245,9 @@ public sealed class Phase2JourneyTests
         var viewModel = new FindingsViewModel(
             navigation,
             new ScanSessionState(),
-            new HealthScorePolicy());
+            new HealthScorePolicy(),
+            new StubGuidedFixPlanService(),
+            new StubUserConfirmationService());
 
         viewModel.GoBackCommand.Execute(null);
 

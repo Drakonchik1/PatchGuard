@@ -34,7 +34,7 @@
                 <views:OptimizeView/>
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:AlertsViewModel}">
-                <views:PlannedFeatureView/>
+                <views:AlertsView/>
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                 <views:SettingsView/>

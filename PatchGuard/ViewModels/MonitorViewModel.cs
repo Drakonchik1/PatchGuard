@@ -86,6 +86,8 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
 
     [ObservableProperty] private bool _hasActiveAlerts;
     [ObservableProperty] private string _alertSummaryText = string.Empty;
+    [ObservableProperty] private string _alertDetailText = string.Empty;
+    [ObservableProperty] private string _alertSeverityLabel = string.Empty;
 
     public void OnNavigatedTo()
     {
@@ -151,11 +153,16 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         if (!HasActiveAlerts)
         {
             AlertSummaryText = string.Empty;
+            AlertDetailText = string.Empty;
+            AlertSeverityLabel = string.Empty;
             return;
         }
 
         var highest = alerts.Max(a => a.Severity);
+        var top = alerts.OrderByDescending(a => a.Severity).First();
+        AlertSeverityLabel = highest.ToString();
         AlertSummaryText = $"{alerts.Count} active · {highest}";
+        AlertDetailText = $"{top.Message} — {top.RecommendedAction}";
     }
 
     private void MaybePersistSnapshot(HardwareSnapshot snapshot)

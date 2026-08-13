@@ -8,6 +8,7 @@ using PatchGuard.Services.Ai;
 using PatchGuard.Services.Ai.Tools;
 using PatchGuard.Services.Alerts;
 using PatchGuard.Services.Diagnostics;
+using PatchGuard.Services.Fixes;
 using PatchGuard.Services.Hardware;
 using PatchGuard.Services.Health;
 using PatchGuard.Services.History;
@@ -95,6 +96,7 @@ public static class DependencyInjection
 
         // Platform + hardware services
         services.AddSingleton<IAdminElevationService, AdminElevationService>();
+        services.AddSingleton<IUserConfirmationService, WpfUserConfirmationService>();
         services.AddSingleton<IOsThermalTemperatureSource, WindowsThermalZoneTemperatureSource>();
         services.AddSingleton<IHardwareMonitorService, LibreHardwareMonitorService>();
         services.AddSingleton<IFpsCaptureService, PresentMonFpsCaptureService>();
@@ -106,6 +108,7 @@ public static class DependencyInjection
         services.AddSingleton<IOptimizationStep, DnsFlushStep>();
         services.AddSingleton<IOptimizationStep, ExplorerRestartStep>();
         services.AddSingleton<ISystemOptimizerService, SystemOptimizerService>();
+        services.AddSingleton<IGuidedFixPlanService, GuidedFixPlanService>();
 
         // Diagnostic modules (registration order is the scan/display order).
         services.AddSingleton<IDiagnosticModule, OsInfoDiagnosticModule>();

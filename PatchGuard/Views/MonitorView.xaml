@@ -69,6 +69,42 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Threshold alert banner -->
+                <Border Style="{StaticResource CardBorder}" BorderBrush="{StaticResource CriticalBrush}"
+                        Visibility="{Binding HasActiveAlerts, Converter={StaticResource BoolVis}}"
+                        Margin="0,0,0,12"
+                        AutomationProperties.Name="Active threshold alerts">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,24,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <TextBlock Text="Threshold alert"
+                                           FontWeight="SemiBold"
+                                           FontSize="15"
+                                           Margin="0,0,12,0"/>
+                                <Border Background="{StaticResource InsetBackgroundBrush}"
+                                        CornerRadius="4"
+                                        Padding="8,2"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding AlertSeverityLabel}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource CriticalBrush}"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding AlertSummaryText}"
+                                       Style="{StaticResource MetricLabel}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock Text="{Binding AlertDetailText}"
+                                       Style="{StaticResource SubtleText}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- Big tiles -->
                 <WrapPanel Orientation="Horizontal">
                     <!-- CPU -->

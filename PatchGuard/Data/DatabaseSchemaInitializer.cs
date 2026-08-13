@@ -12,6 +12,7 @@ public sealed class DatabaseSchemaInitializer
     private const string SnapshotMigration = "20260712_HealthScoreSnapshots";
     private const string CouncilEvaluationMigration = "20260810_CouncilEvaluationRecords";
     private const string SensorSnapshotMigration = "20260813_SensorSnapshotRecords";
+    private const string GuidedFixRunMigration = "20260813_GuidedFixRunRecords";
     private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
     private readonly IHealthScorePolicy _healthScorePolicy;
 
@@ -88,6 +89,21 @@ public sealed class DatabaseSchemaInitializer
             );
             CREATE INDEX IF NOT EXISTS "IX_SensorSnapshots_CapturedAt" ON "SensorSnapshots" ("CapturedAt");
 
+            CREATE TABLE IF NOT EXISTS "GuidedFixRuns" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_GuidedFixRuns" PRIMARY KEY AUTOINCREMENT,
+                "RanAt" TEXT NOT NULL,
+                "Source" TEXT NOT NULL DEFAULT '',
+                "PlanTitle" TEXT NOT NULL DEFAULT '',
+                "Outcome" TEXT NOT NULL DEFAULT '',
+                "StepsSucceeded" INTEGER NOT NULL DEFAULT 0,
+                "StepsTotal" INTEGER NOT NULL DEFAULT 0,
+                "BytesFreed" INTEGER NOT NULL DEFAULT 0,
+                "Verified" INTEGER NOT NULL DEFAULT 0,
+                "LinkedScanScenario" TEXT NULL,
+                "Summary" TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS "IX_GuidedFixRuns_RanAt" ON "GuidedFixRuns" ("RanAt");
+
             CREATE TABLE IF NOT EXISTS "SchemaMigrations" (
                 "MigrationId" TEXT NOT NULL CONSTRAINT "PK_SchemaMigrations" PRIMARY KEY,
                 "AppliedAt" TEXT NOT NULL
@@ -137,6 +153,12 @@ public sealed class DatabaseSchemaInitializer
             $"""
              INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
              VALUES ({SensorSnapshotMigration}, {DateTime.UtcNow});
+             """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT OR IGNORE INTO "SchemaMigrations" ("MigrationId", "AppliedAt")
+             VALUES ({GuidedFixRunMigration}, {DateTime.UtcNow});
              """,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
