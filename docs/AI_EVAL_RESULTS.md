@@ -2,6 +2,9 @@
 
 Compare structural quality and latency across council backends on the same findings.
 
+> **Sprint 1 task:** fill the table below with real runs (Rules + Ollama minimum).  
+> See [SPRINT_PLAN.md](SPRINT_PLAN.md) · Sprint 7 adds a controlled before/after experiment.
+
 ## How to measure
 
 1. Set `OpenAI:ApiKey` empty, `Ollama:Enabled` true, `Ai:ChatProvider` to `Rules` then `Ollama` (or set `Ollama:Model` to your pulled tag — see [OLLAMA_SETUP.md](OLLAMA_SETUP.md)).
