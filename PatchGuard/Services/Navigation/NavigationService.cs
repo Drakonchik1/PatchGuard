@@ -19,10 +19,28 @@ public sealed class NavigationService : INavigationService
 
     public void NavigateTo<TViewModel>() where TViewModel : class
     {
+        NavigateCore<TViewModel>(retainCurrent: true);
+    }
+
+    public void NavigateTopLevel<TViewModel>() where TViewModel : class
+    {
+        NavigateCore<TViewModel>(retainCurrent: false);
+    }
+
+    private void NavigateCore<TViewModel>(bool retainCurrent) where TViewModel : class
+    {
+        if (!retainCurrent)
+        {
+            _history.Clear();
+        }
+
         if (_host.CurrentViewModel is not null)
         {
             (_host.CurrentViewModel as INavigationLeave)?.OnNavigatedFrom();
-            _history.Push(_host.CurrentViewModel);
+            if (retainCurrent)
+            {
+                _history.Push(_host.CurrentViewModel);
+            }
         }
 
         var viewModel = _serviceProvider.GetRequiredService<TViewModel>();

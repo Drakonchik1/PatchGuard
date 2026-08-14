@@ -1,7 +1,7 @@
 namespace PatchGuard.Services.Ai;
 
 /// <summary>
-/// Shared chat backend for the AI council — OpenAI (cloud) or Ollama (local).
+/// Shared chat backend for the AI council — OpenAI, Azure OpenAI, or Ollama (local).
 /// </summary>
 public interface IChatCompletionProvider
 {

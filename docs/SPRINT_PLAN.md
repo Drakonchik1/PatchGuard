@@ -34,7 +34,7 @@
 | 3 | Guided fixes + alerts UI | ✅ Done | Sprint 2 |
 | 4 | Classic ML (Microsoft.ML) | ✅ Done | Sprint 2 |
 | 5 | AI polish (RAG, agent, settings) | ✅ Done | Sprint 4 |
-| 6 | Cloud adapters (Azure + secrets) | ⬜ Not started | Sprint 5 |
+| 6 | Cloud adapters (Azure + secrets) | ✅ Done | Sprint 5 |
 | 7 | Quality loop + portfolio | ⬜ Not started | Sprint 6 |
 | 8 | UX optimization + settings full | ⬜ Not started | Sprint 3 |
 
@@ -400,11 +400,11 @@ Keep agent tools read-only. Run full dotnet test. Mark Sprint 5 ✅ in docs/SPRI
 
 ### Definition of Done
 
-- [ ] Azure provider works with mock test (or documented manual test steps)
-- [ ] Secrets stored via DPAPI, not plain text in user-editable JSON
-- [ ] `CLOUD_ARCHITECTURE.md` complete
-- [ ] Bedrock stub documented as optional/future
-- [ ] Privacy tests still pass
+- [x] Azure provider works with mock test (or documented manual test steps)
+- [x] Secrets stored via DPAPI, not plain text in user-editable JSON
+- [x] `CLOUD_ARCHITECTURE.md` complete
+- [x] Bedrock stub documented as optional/future
+- [x] Privacy tests still pass
 
 ### Verify
 

@@ -28,13 +28,16 @@ public sealed class FindingItemViewModel
     public FindingVerificationStatus VerificationStatus => Finding.VerificationStatus;
 }
 
-public partial class FindingsViewModel : ObservableObject, INavigationAware
+public partial class FindingsViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly INavigationService _navigation;
     private readonly ScanSessionState _session;
     private readonly IHealthScorePolicy _healthScorePolicy;
     private readonly IGuidedFixPlanService _fixPlans;
     private readonly IUserConfirmationService _confirmation;
+    private NavigationLifecycle? _lifecycle;
+    private Task _fixTask = Task.CompletedTask;
+    private int _lifecycleGeneration;
 
     public FindingsViewModel(
         INavigationService navigation,
@@ -110,6 +113,9 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 
     public void OnNavigatedTo()
     {
+        RetireLifecycle();
+        _lifecycle = new NavigationLifecycle();
+        Interlocked.Increment(ref _lifecycleGeneration);
         Findings.Clear();
         ScanMetrics.Clear();
         FixStatusMessage = null;
@@ -139,6 +145,13 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
         OnPropertyChanged(nameof(HasSystemMetrics));
     }
 
+    public void OnNavigatedFrom()
+    {
+        RetireLifecycle();
+        IsFixRunning = false;
+        RunSafeFixCommand.NotifyCanExecuteChanged();
+    }
+
     partial void OnHealthScoreChanged(int value)
     {
         OnPropertyChanged(nameof(HealthStatusLabel));
@@ -150,11 +163,13 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
     partial void OnCriticalCountChanged(int value) => OnPropertyChanged(nameof(HealthStatusDetail));
 
     [RelayCommand(CanExecute = nameof(CanRunFix))]
-    private async Task RunSafeFixAsync(FindingItemViewModel? item)
+    private Task RunSafeFixAsync(FindingItemViewModel? item)
     {
-        if (item is null || !item.CanRunSafeFix)
+        if (item is null ||
+            !item.CanRunSafeFix ||
+            _lifecycle is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var scenario = _session.SelectedScenario?.GetTitle();
@@ -162,7 +177,7 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
         if (plan is null)
         {
             FixStatusMessage = "No safe automated fix is available for this finding.";
-            return;
+            return Task.CompletedTask;
         }
 
         var preview = _fixPlans.Preview(plan);
@@ -174,25 +189,63 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
         if (!_confirmation.Confirm("Confirm guided fix", confirmMessage))
         {
             FixStatusMessage = "Fix cancelled. No system changes were made.";
-            return;
+            return Task.CompletedTask;
         }
 
         IsFixRunning = true;
         RunSafeFixCommand.NotifyCanExecuteChanged();
         FixStatusMessage = "Running safe fix…";
-        try
-        {
-            var result = await _fixPlans.ExecuteAsync(plan, GuidedFixConfirmation.ConfirmNow());
-            FixStatusMessage = result.Summary;
-        }
-        catch (Exception ex)
-        {
-            FixStatusMessage = $"Guided fix failed: {ex.Message}";
-        }
-        finally
+        if (_lifecycle is not { } lifecycle ||
+            !lifecycle.TryAcquire(out var lease))
         {
             IsFixRunning = false;
             RunSafeFixCommand.NotifyCanExecuteChanged();
+            return Task.CompletedTask;
+        }
+
+        var generation = Volatile.Read(ref _lifecycleGeneration);
+        var fixTask = RunSafeFixCoreAsync(plan, generation, lease!);
+        _fixTask = ActiveTaskTracker.Retain(_fixTask, fixTask);
+        return fixTask;
+    }
+
+    private async Task RunSafeFixCoreAsync(
+        GuidedFixPlan plan,
+        int generation,
+        NavigationLifecycleLease lease)
+    {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
+        try
+        {
+            var result = await _fixPlans.ExecuteAsync(
+                plan,
+                GuidedFixConfirmation.ConfirmNow(),
+                cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsCurrent(generation, cancellationToken))
+            {
+                FixStatusMessage = result.Summary;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                FixStatusMessage = $"Guided fix failed: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                IsFixRunning = false;
+                RunSafeFixCommand.NotifyCanExecuteChanged();
+            }
         }
     }
 
@@ -208,4 +261,14 @@ public partial class FindingsViewModel : ObservableObject, INavigationAware
 
     [RelayCommand]
     private void GoBack() => _navigation.GoBack();
+
+    private void RetireLifecycle()
+    {
+        Interlocked.Increment(ref _lifecycleGeneration);
+        Interlocked.Exchange(ref _lifecycle, null)?.Retire();
+    }
+
+    private bool IsCurrent(int generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _lifecycleGeneration);
 }

@@ -17,7 +17,7 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 | 6 | LangGraph analog | 3 | 1, 5 | Semantic Kernel graph | **Done** |
 | 7 | n8n | 1 ext. | 7 | KB reindex → JSON export | **Planned** (optional) |
 | 1 | Classic ML | 4 | 4 | Microsoft.ML anomaly + test metrics | **Done** |
-| 8 | Azure / AWS | 5 | 6 | Azure adapter + cloud doc + Bedrock stub | **Planned** |
+| 8 | Azure / AWS | 5 | 6 | Azure adapter + cloud doc + Bedrock stub | **Done** · Bedrock = stub |
 | 9 | CI regression | 6 | 1, 5, 7 | Golden eval gate in GitHub Actions | **Done** · >5% gate Sprint 5 |
 
 ## Phase 0 — Metrics (core done)
@@ -67,11 +67,11 @@ Learning / portfolio track for PatchGuard’s AI stack. Product UX phases: [UX_R
 
 **Depends on:** Sprint 2 sensor history (`ISensorHistoryService`).
 
-## Phase 5 — Cloud adapter (Sprint 6)
+## Phase 5 — Cloud adapter (Sprint 6) ✅ Done
 
 - `AzureOpenAiChatProvider` behind `IChatCompletionProvider`
-- DPAPI secret storage (not plain JSON)
-- `docs/CLOUD_ARCHITECTURE.md` + Bedrock stub (honest scope)
+- DPAPI secret storage (not plain JSON) + Settings Azure fields
+- `docs/CLOUD_ARCHITECTURE.md` + `BedrockChatProvider` stub (honest scope)
 
 ## Phase 6 — Quality loop (Sprint 1, 5, 7)
 
@@ -91,4 +91,5 @@ See [OLLAMA_SETUP.md](OLLAMA_SETUP.md).
 | [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md) | Metrics + golden baseline |
 | [AI_EVAL_RESULTS.md](AI_EVAL_RESULTS.md) | Provider comparison worksheet |
 | [ML_REPORT.md](ML_REPORT.md) | Classic ML anomaly metrics + limitations |
+| [CLOUD_ARCHITECTURE.md](CLOUD_ARCHITECTURE.md) | Hybrid desktop, Azure, DPAPI, Bedrock stub |
 | [UX_ROADMAP.md](UX_ROADMAP.md) | Product phases (parallel track) |

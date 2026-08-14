@@ -70,9 +70,13 @@ public sealed class CouncilEvaluationService : ICouncilEvaluationService
         var hasAi = sources.Contains(GuidanceSource.AiGenerated);
         var hasWeb = sources.Contains(GuidanceSource.WebSourced);
         var hasKb = sources.Contains(GuidanceSource.KnowledgeBase);
-        var aiLabel = string.Equals(aiProviderName, OllamaChatProvider.ProviderName, StringComparison.OrdinalIgnoreCase)
-            ? "Ollama"
-            : "AI";
+        var aiLabel = aiProviderName?.ToUpperInvariant() switch
+        {
+            "OLLAMA" => "Ollama",
+            "AZURE" => "Azure",
+            "OPENAI" => "AI",
+            _ => "AI"
+        };
 
         return (hasAi, hasWeb) switch
         {

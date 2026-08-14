@@ -54,109 +54,226 @@ public sealed class TempFilesCleanStep : IOptimizationStep
         yield return Environment.GetFolderPath(Environment.SpecialFolder.InternetCache);
     }
 
-    // Skip symlinks/junctions (and hidden/system OS files) so cleanup can never
-    // follow a reparse point out of the temp root and delete unrelated data.
     private static readonly EnumerationOptions SafeEnumeration = new()
     {
-        RecurseSubdirectories = true,
+        RecurseSubdirectories = false,
         IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System
+        AttributesToSkip = FileAttributes.System
     };
 
     private static (long bytes, int count) CleanDirectory(string root, CancellationToken cancellationToken)
     {
         long bytes = 0;
         var count = 0;
+        var directories = new List<DirectoryInfo>();
 
-        // Canonical root used as a containment boundary for every delete.
-        var rootFull = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
-
-        IEnumerable<string> files;
-        try
-        {
-            files = Directory.EnumerateFiles(root, "*", SafeEnumeration);
-        }
-        catch
+        if (!TryGetSafeRoot(root, out var rootDirectory, out var rootPrefix))
         {
             return (0, 0);
         }
 
-        foreach (var file in files)
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(rootDirectory);
+
+        while (pending.Count > 0)
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 break;
             }
 
+            var directory = pending.Pop();
+            if (!IsSafeContainedEntry(directory, rootPrefix, allowRoot: true))
+            {
+                continue;
+            }
+
+            FileSystemInfo[] entries;
             try
             {
-                if (!IsContained(file, rootFull))
-                {
-                    continue;
-                }
-
-                var info = new FileInfo(file);
-                if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
-                {
-                    continue;
-                }
-
-                var size = info.Length;
-                info.Delete();
-                bytes += size;
-                count++;
+                entries = directory.EnumerateFileSystemInfos("*", SafeEnumeration).ToArray();
             }
             catch
             {
-                // Locked or in-use file; leave it alone.
+                continue;
             }
-        }
 
-        TryRemoveEmptyDirectories(root, rootFull, cancellationToken);
-        return (bytes, count);
-    }
-
-    private static void TryRemoveEmptyDirectories(string root, string rootFull, CancellationToken cancellationToken)
-    {
-        try
-        {
-            foreach (var dir in Directory.EnumerateDirectories(root, "*", SafeEnumeration)
-                         .OrderByDescending(d => d.Length))
+            foreach (var entry in entries)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
 
-                try
+                if (!IsSafeContainedEntry(entry, rootPrefix, allowRoot: false))
                 {
-                    if (IsContained(dir, rootFull) && !Directory.EnumerateFileSystemEntries(dir).Any())
-                    {
-                        Directory.Delete(dir);
-                    }
+                    continue;
                 }
-                catch
+
+                if (entry is DirectoryInfo childDirectory)
                 {
-                    // ignored
+                    directories.Add(childDirectory);
+                    pending.Push(childDirectory);
+                    continue;
                 }
+
+                if (entry is FileInfo file && TryDeleteFile(file, rootPrefix, out var fileBytes))
+                {
+                    bytes += fileBytes;
+                    count++;
+                }
+            }
+        }
+
+        foreach (var directory in directories.OrderByDescending(item => item.FullName.Length))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            TryDeleteEmptyDirectory(directory, rootPrefix);
+        }
+
+        return (bytes, count);
+    }
+
+    private static bool TryDeleteFile(FileInfo file, string rootPrefix, out long bytes)
+    {
+        bytes = 0;
+        try
+        {
+            file.Refresh();
+            if (!IsSafeContainedEntry(file, rootPrefix, allowRoot: false))
+            {
+                return false;
+            }
+
+            var length = file.Length;
+
+            // Re-check the trust boundary immediately before deletion.
+            file.Refresh();
+            if (!IsSafeContainedEntry(file, rootPrefix, allowRoot: false))
+            {
+                return false;
+            }
+
+            file.Delete();
+            bytes = length;
+            return true;
+        }
+        catch
+        {
+            // Locked, changed, or inaccessible file; fail closed.
+            return false;
+        }
+    }
+
+    private static void TryDeleteEmptyDirectory(DirectoryInfo directory, string rootPrefix)
+    {
+        try
+        {
+            directory.Refresh();
+            if (!IsSafeContainedEntry(directory, rootPrefix, allowRoot: false))
+            {
+                return;
+            }
+
+            if (directory.EnumerateFileSystemInfos("*", SafeEnumeration).Any())
+            {
+                return;
+            }
+
+            // Re-check the trust boundary immediately before deletion.
+            directory.Refresh();
+            if (IsSafeContainedEntry(directory, rootPrefix, allowRoot: false))
+            {
+                directory.Delete();
             }
         }
         catch
         {
-            // ignored
+            // Directory changed, is inaccessible, or is not empty; leave it alone.
         }
     }
 
-    private static bool IsContained(string path, string rootFull)
+    private static bool TryGetSafeRoot(
+        string root,
+        out DirectoryInfo rootDirectory,
+        out string rootPrefix)
     {
+        rootDirectory = null!;
+        rootPrefix = string.Empty;
         try
         {
-            var full = Path.GetFullPath(path);
-            return full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase);
+            var rootFull = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            rootDirectory = new DirectoryInfo(rootFull);
+            rootDirectory.Refresh();
+            if (!rootDirectory.Exists ||
+                rootDirectory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                return false;
+            }
+
+            rootPrefix = rootFull + Path.DirectorySeparatorChar;
+            return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static bool IsSafeContainedEntry(
+        FileSystemInfo entry,
+        string rootPrefix,
+        bool allowRoot)
+    {
+        try
+        {
+            entry.Refresh();
+            if (!entry.Exists || entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                return false;
+            }
+
+            var fullPath = Path.GetFullPath(entry.FullName);
+            if (HasReparsePointInAncestors(fullPath))
+            {
+                return false;
+            }
+
+            if (allowRoot &&
+                string.Equals(
+                    Path.TrimEndingDirectorySeparator(fullPath),
+                    Path.TrimEndingDirectorySeparator(rootPrefix),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return fullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HasReparsePointInAncestors(string fullPath)
+    {
+        var parent = Directory.GetParent(fullPath);
+        while (parent is not null)
+        {
+            parent.Refresh();
+            if (!parent.Exists || parent.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                return true;
+            }
+
+            parent = parent.Parent;
+        }
+
+        return false;
     }
 }

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -25,12 +26,6 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
     {
         _httpClient = httpClient;
         _options = options;
-
-        if (_httpClient.BaseAddress is null &&
-            Uri.TryCreate(NormalizeBaseUrl(options.OllamaBaseUrl), UriKind.Absolute, out var baseUri))
-        {
-            _httpClient.BaseAddress = baseUri;
-        }
     }
 
     public string Name => ProviderName;
@@ -38,7 +33,8 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
     public bool IsAvailable =>
         _options.OllamaEnabled
         && !string.IsNullOrWhiteSpace(_options.OllamaBaseUrl)
-        && !string.IsNullOrWhiteSpace(_options.OllamaModel);
+        && !string.IsNullOrWhiteSpace(_options.OllamaModel)
+        && IsLoopbackEndpoint(_options.OllamaBaseUrl);
 
     public async Task<string> CompleteAsync(
         string systemPrompt,
@@ -46,7 +42,9 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
         IReadOnlyList<(string Role, string Content)>? priorMessages = null,
         CancellationToken cancellationToken = default)
     {
-        if (!IsAvailable)
+        if (!_options.OllamaEnabled ||
+            string.IsNullOrWhiteSpace(_options.OllamaModel) ||
+            !TryGetLoopbackEndpoint(_options.OllamaBaseUrl, out var endpoint))
         {
             throw new InvalidOperationException("Ollama is not enabled or configured.");
         }
@@ -80,14 +78,19 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
         };
 
         var json = JsonSerializer.Serialize(body, JsonOptions);
-        using var response = await _httpClient.PostAsync(
-            "api/chat",
-            new StringContent(json, Encoding.UTF8, "application/json"),
+        var requestUri = new Uri(endpoint, "api/chat");
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var stream = await BoundedHttpResponse.ReadAsStreamAsync(response, cancellationToken);
         var parsed = await JsonSerializer.DeserializeAsync<OllamaChatResponse>(stream, JsonOptions, cancellationToken);
 
         var reply = parsed?.Message?.Content?.Trim();
@@ -99,10 +102,84 @@ public sealed class OllamaChatProvider : IChatCompletionProvider
         return reply;
     }
 
+    public static bool IsLoopbackEndpoint(string? endpoint) =>
+        TryGetLoopbackEndpoint(endpoint, out _);
+
     public static string NormalizeBaseUrl(string baseUrl)
     {
         var trimmed = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
         return string.IsNullOrEmpty(trimmed) ? "http://localhost:11434/" : trimmed + "/";
+    }
+
+    private static bool TryGetLoopbackEndpoint(string? endpoint, out Uri uri)
+    {
+        uri = null!;
+        if (string.IsNullOrWhiteSpace(endpoint) ||
+            !Uri.TryCreate(endpoint.Trim(), UriKind.Absolute, out var candidate) ||
+            (candidate.Scheme != Uri.UriSchemeHttp && candidate.Scheme != Uri.UriSchemeHttps) ||
+            !string.IsNullOrEmpty(candidate.UserInfo) ||
+            HasUserInfoDelimiter(endpoint.Trim()) ||
+            !string.IsNullOrEmpty(candidate.Query) ||
+            !string.IsNullOrEmpty(candidate.Fragment) ||
+            !IsLoopbackHost(candidate))
+        {
+            return false;
+        }
+
+        uri = new Uri(candidate.AbsoluteUri.TrimEnd('/') + "/", UriKind.Absolute);
+        return true;
+    }
+
+    private static bool IsLoopbackHost(Uri uri)
+    {
+        if (string.Equals(uri.DnsSafeHost, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!IPAddress.TryParse(uri.DnsSafeHost, out var address))
+        {
+            return false;
+        }
+
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            return address.GetAddressBytes()[0] == 127;
+        }
+
+        return IPAddress.IPv6Loopback.Equals(address);
+    }
+
+    private static bool HasUserInfoDelimiter(string value)
+    {
+        var authorityStart = value.IndexOf("://", StringComparison.Ordinal);
+        if (authorityStart < 0)
+        {
+            return false;
+        }
+
+        authorityStart += 3;
+        var at = value.IndexOf('@', authorityStart);
+        if (at < 0)
+        {
+            return false;
+        }
+
+        return IsBeforeDelimiter(value, at, authorityStart, '/') &&
+               IsBeforeDelimiter(value, at, authorityStart, '\\') &&
+               IsBeforeDelimiter(value, at, authorityStart, '?') &&
+               IsBeforeDelimiter(value, at, authorityStart, '#');
+    }
+
+    private static bool IsBeforeDelimiter(string value, int position, int start, char delimiter)
+    {
+        var delimiterPosition = value.IndexOf(delimiter, start);
+        return delimiterPosition < 0 || position < delimiterPosition;
     }
 
     private sealed class OllamaChatResponse

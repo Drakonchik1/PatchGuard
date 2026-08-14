@@ -57,22 +57,22 @@ public partial class MainViewModel : ObservableObject, IViewModelHost
                 navigation.NavigateHome();
                 break;
             case "Diagnose":
-                navigation.NavigateTo<DiagnoseViewModel>();
+                navigation.NavigateTopLevel<DiagnoseViewModel>();
                 break;
             case "LiveMonitor":
-                navigation.NavigateTo<MonitorViewModel>();
+                navigation.NavigateTopLevel<MonitorViewModel>();
                 break;
             case "GamePerformance":
-                navigation.NavigateTo<FpsViewModel>();
+                navigation.NavigateTopLevel<FpsViewModel>();
                 break;
             case "Optimize":
-                navigation.NavigateTo<OptimizeViewModel>();
+                navigation.NavigateTopLevel<OptimizeViewModel>();
                 break;
             case "Alerts":
-                navigation.NavigateTo<AlertsViewModel>();
+                navigation.NavigateTopLevel<AlertsViewModel>();
                 break;
             case "Settings":
-                navigation.NavigateTo<SettingsViewModel>();
+                navigation.NavigateTopLevel<SettingsViewModel>();
                 break;
         }
     }

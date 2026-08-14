@@ -66,14 +66,18 @@ public sealed class OpenAiChatClient : IChatCompletionProvider
         };
 
         var json = JsonSerializer.Serialize(body, JsonOptions);
-        using var response = await _httpClient.PostAsync(
-            "chat/completions",
-            new StringContent(json, Encoding.UTF8, "application/json"),
+        using var request = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var stream = await BoundedHttpResponse.ReadAsStreamAsync(response, cancellationToken);
         var parsed = await JsonSerializer.DeserializeAsync<ChatCompletionResponse>(stream, JsonOptions, cancellationToken);
 
         return parsed?.Choices?.FirstOrDefault()?.Message?.Content?.Trim()

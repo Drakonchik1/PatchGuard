@@ -20,12 +20,31 @@ public sealed class ExplorerRestartStep : IOptimizationStep
         var killed = 0;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var explorerPath = ResolveWindowsExecutable(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "explorer.exe");
+            if (explorerPath is null)
+            {
+                return new OptimizationStepResult
+                {
+                    StepName = Name,
+                    Status = OptimizationStatus.Failed,
+                    Detail = "The canonical Windows explorer.exe path is unavailable."
+                };
+            }
+
             foreach (var process in Process.GetProcessesByName("explorer"))
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     process.Kill();
                     killed++;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch
                 {
@@ -40,16 +59,23 @@ public sealed class ExplorerRestartStep : IOptimizationStep
             // Give the shell a moment, then ensure it is running again.
             await Task.Delay(1500, cancellationToken);
 
-            if (Process.GetProcessesByName("explorer").Length == 0)
+            if (!IsExplorerRunning())
             {
-                var explorer = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                    "explorer.exe");
-                Process.Start(new ProcessStartInfo
+                cancellationToken.ThrowIfCancellationRequested();
+                using var process = Process.Start(new ProcessStartInfo
                 {
-                    FileName = File.Exists(explorer) ? explorer : "explorer.exe",
-                    UseShellExecute = true
+                    FileName = explorerPath,
+                    UseShellExecute = false
                 });
+                if (process is null)
+                {
+                    return new OptimizationStepResult
+                    {
+                        StepName = Name,
+                        Status = OptimizationStatus.Failed,
+                        Detail = "Could not start the canonical Windows explorer.exe."
+                    };
+                }
             }
 
             return new OptimizationStepResult
@@ -59,6 +85,10 @@ public sealed class ExplorerRestartStep : IOptimizationStep
                 Detail = killed > 0 ? "Explorer restarted." : "Explorer was not running; started it."
             };
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return new OptimizationStepResult
@@ -67,6 +97,61 @@ public sealed class ExplorerRestartStep : IOptimizationStep
                 Status = OptimizationStatus.Failed,
                 Detail = ex.Message
             };
+        }
+    }
+
+    private static bool IsExplorerRunning()
+    {
+        var processes = Process.GetProcessesByName("explorer");
+        try
+        {
+            return processes.Length > 0;
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    private static string? ResolveWindowsExecutable(string directory, string fileName)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                return null;
+            }
+
+            var canonicalDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+            var directoryInfo = new DirectoryInfo(canonicalDirectory);
+            directoryInfo.Refresh();
+            if (!directoryInfo.Exists ||
+                directoryInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                return null;
+            }
+
+            var candidate = Path.GetFullPath(Path.Combine(canonicalDirectory, fileName));
+            if (!string.Equals(
+                    Path.GetDirectoryName(candidate),
+                    canonicalDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var info = new FileInfo(candidate);
+            info.Refresh();
+            return info.Exists && !info.Attributes.HasFlag(FileAttributes.ReparsePoint)
+                ? candidate
+                : null;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

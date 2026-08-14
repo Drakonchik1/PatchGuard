@@ -6,6 +6,7 @@
              xmlns:vm="clr-namespace:PatchGuard.ViewModels">
     <UserControl.Resources>
         <conv:StringEqualsConverter x:Key="StrEq"/>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
     </UserControl.Resources>
     <Grid Style="{StaticResource PageRoot}">
         <Grid.RowDefinitions>
@@ -24,7 +25,7 @@
                     <StackPanel>
                         <TextBlock Text="AI chat provider"
                                    Style="{StaticResource SectionHeader}"/>
-                        <TextBlock Text="Persisted locally under %LocalAppData%\PatchGuard. Cloud still requires per-request consent in Guide."
+                        <TextBlock Text="Provider choice is in %LocalAppData%\PatchGuard\user-settings.json. API keys use Windows DPAPI under secrets\ — never plain JSON."
                                    Style="{StaticResource SubtleText}"
                                    Margin="0,0,0,18"
                                    TextWrapping="Wrap"/>
@@ -35,6 +36,12 @@
                                      Foreground="{StaticResource TextPrimaryBrush}"
                                      IsChecked="{Binding SelectedChatProvider, Converter={StaticResource StrEq}, ConverterParameter=OpenAI, Mode=TwoWay}"
                                      AutomationProperties.Name="Use Cloud OpenAI chat provider"/>
+                        <RadioButton GroupName="ChatProvider"
+                                     Content="Azure OpenAI"
+                                     Margin="0,0,0,10"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     IsChecked="{Binding SelectedChatProvider, Converter={StaticResource StrEq}, ConverterParameter=Azure, Mode=TwoWay}"
+                                     AutomationProperties.Name="Use Azure OpenAI chat provider"/>
                         <RadioButton GroupName="ChatProvider"
                                      Content="Ollama (local LLM)"
                                      Margin="0,0,0,10"
@@ -50,7 +57,41 @@
 
                         <TextBlock Text="{Binding ProviderStatus}"
                                    Style="{StaticResource SubtleText}"
-                                   TextWrapping="Wrap"/>
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"/>
+
+                        <StackPanel Visibility="{Binding IsAzurePanelVisible, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="Azure OpenAI"
+                                       Style="{StaticResource SectionHeader}"
+                                       Margin="0,8,0,8"/>
+                            <TextBlock Text="Endpoint"
+                                       Style="{StaticResource SubtleText}"
+                                       Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding AzureEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,10"
+                                     AutomationProperties.Name="Azure OpenAI endpoint"/>
+                            <TextBlock Text="Deployment name"
+                                       Style="{StaticResource SubtleText}"
+                                       Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding AzureDeployment, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,10"
+                                     AutomationProperties.Name="Azure OpenAI deployment"/>
+                            <TextBlock Text="API key (leave blank to keep existing DPAPI secret)"
+                                       Style="{StaticResource SubtleText}"
+                                       Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding AzureApiKeyInput, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,10"
+                                     AutomationProperties.Name="Azure OpenAI API key"/>
+                            <Button Content="Save Azure settings"
+                                    Command="{Binding SaveAzureSettingsCommand}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,0,8"
+                                    Padding="12,6"
+                                    AutomationProperties.Name="Save Azure OpenAI settings"/>
+                            <TextBlock Text="{Binding AzureSecretStatus}"
+                                       Style="{StaticResource SubtleText}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

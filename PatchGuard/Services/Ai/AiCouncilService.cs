@@ -154,7 +154,6 @@ public sealed class AiCouncilService : IAiCouncilService
                 .Where(result => ExternalUrlPolicy.TryNormalize(result.Url, out _))
                 .ToList();
             bundles.Add((query, results));
-            await Task.Delay(200, cancellationToken);
         }
 
         return bundles;

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace PatchGuard.Services.Settings;
@@ -61,7 +62,55 @@ public sealed class JsonUserSettingsStore : IUserSettingsStore
             }
 
             var json = JsonSerializer.Serialize(settings, JsonOptions);
-            File.WriteAllText(_path, json);
+            AtomicWriteAllText(_path, json);
+        }
+    }
+
+    private static void AtomicWriteAllText(string path, string contents)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath)
+            ?? throw new IOException("The settings path has no parent directory.");
+        var temporaryPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 4096,
+                       FileOptions.WriteThrough))
+            using (var writer = new StreamWriter(
+                       stream,
+                       new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                       bufferSize: 4096,
+                       leaveOpen: true))
+            {
+                writer.Write(contents);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporaryPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(temporaryPath);
+            }
+            catch (IOException)
+            {
+                // Best effort after a failed replacement; preserve the original exception.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Best effort after a failed replacement; preserve the original exception.
+            }
         }
     }
 

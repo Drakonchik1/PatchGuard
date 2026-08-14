@@ -3,6 +3,7 @@ namespace PatchGuard.Services.Ai;
 public sealed class AiOptions
 {
     public const string OpenAiSection = "OpenAI";
+    public const string AzureOpenAiSection = "AzureOpenAI";
     public const string WebSearchSection = "WebSearch";
     public const string OllamaSection = "Ollama";
     public const string AiSection = "Ai";
@@ -13,7 +14,17 @@ public sealed class AiOptions
     public string WebSearchProvider { get; set; } = "tavily";
     public string WebSearchApiKey { get; set; } = string.Empty;
 
-    /// <summary>Auto | OpenAI | Ollama | Rules</summary>
+    /// <summary>Azure OpenAI resource endpoint, e.g. https://my-resource.openai.azure.com/</summary>
+    public string AzureEndpoint { get; set; } = string.Empty;
+
+    /// <summary>Deployment name (not the model catalog name).</summary>
+    public string AzureDeployment { get; set; } = string.Empty;
+
+    public string AzureApiKey { get; set; } = string.Empty;
+
+    public string AzureApiVersion { get; set; } = "2024-06-01";
+
+    /// <summary>Auto | OpenAI | Azure | Ollama | Rules</summary>
     public string ChatProvider { get; set; } = "Auto";
 
     /// <summary>Default false so unit tests stay offline unless explicitly enabled.</summary>

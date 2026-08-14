@@ -8,10 +8,14 @@ using PatchGuard.Services.Optimization;
 
 namespace PatchGuard.ViewModels;
 
-public partial class OptimizeViewModel : ObservableObject, INavigationAware
+public partial class OptimizeViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly ISystemOptimizerService _optimizer;
     private readonly IPerformanceHistoryService _history;
+    private NavigationLifecycle? _lifecycle;
+    private Task _loadHistoryTask = Task.CompletedTask;
+    private Task _optimizeTask = Task.CompletedTask;
+    private int _lifecycleGeneration;
 
     public OptimizeViewModel(ISystemOptimizerService optimizer, IPerformanceHistoryService history)
     {
@@ -31,8 +35,24 @@ public partial class OptimizeViewModel : ObservableObject, INavigationAware
 
     public void OnNavigatedTo()
     {
+        RetireLifecycle();
+        var lifecycle = new NavigationLifecycle();
+        _lifecycle = lifecycle;
+        var generation = Interlocked.Increment(ref _lifecycleGeneration);
         PreviewSteps();
-        _ = LoadHistoryAsync();
+        if (lifecycle.TryAcquire(out var lease))
+        {
+            _loadHistoryTask = ActiveTaskTracker.Retain(
+                _loadHistoryTask,
+                LoadHistoryAsync(generation, lease!));
+        }
+    }
+
+    public void OnNavigatedFrom()
+    {
+        RetireLifecycle();
+        IsRunning = false;
+        OptimizeCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIncludeExplorerRestartChanged(bool value)
@@ -60,32 +80,89 @@ public partial class OptimizeViewModel : ObservableObject, INavigationAware
     }
 
     [RelayCommand(CanExecute = nameof(CanRun))]
-    private async Task OptimizeAsync()
+    private Task OptimizeAsync()
     {
+        if (_lifecycle is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        PreviewSteps();
         IsRunning = true;
         OptimizeCommand.NotifyCanExecuteChanged();
-        PreviewSteps();
         SummaryText = "Optimizing…";
-
-        var progress = new Progress<OptimizationStepResult>(OnStepProgress);
-
-        try
-        {
-            var summary = await _optimizer.RunAsync(IncludeExplorerRestart, progress);
-            TotalFreedText = OptimizationStepResult.FormatBytes(summary.TotalBytesFreed);
-            SummaryText = $"Done — {summary.SucceededCount} of {summary.Steps.Count} step(s) succeeded, {TotalFreedText} reclaimed.";
-            HasResult = true;
-            await _history.SaveOptimizationAsync(summary);
-            await LoadHistoryAsync();
-        }
-        catch (Exception ex)
-        {
-            SummaryText = $"Optimization error: {ex.Message}";
-        }
-        finally
+        if (_lifecycle is not { } lifecycle ||
+            !lifecycle.TryAcquire(out var lease))
         {
             IsRunning = false;
             OptimizeCommand.NotifyCanExecuteChanged();
+            return Task.CompletedTask;
+        }
+
+        var generation = Volatile.Read(ref _lifecycleGeneration);
+        var optimizeTask = OptimizeCoreAsync(generation, lease!);
+        _optimizeTask = ActiveTaskTracker.Retain(
+            _optimizeTask,
+            optimizeTask);
+        return optimizeTask;
+    }
+
+    private async Task OptimizeCoreAsync(
+        int generation,
+        NavigationLifecycleLease lease)
+    {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
+        var progress = new Progress<OptimizationStepResult>(update =>
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                OnStepProgress(update);
+            }
+        });
+
+        try
+        {
+            var summary = await _optimizer.RunAsync(
+                IncludeExplorerRestart,
+                progress,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrent(generation, cancellationToken))
+            {
+                return;
+            }
+
+            TotalFreedText = OptimizationStepResult.FormatBytes(summary.TotalBytesFreed);
+            SummaryText = $"Done — {summary.SucceededCount} of {summary.Steps.Count} step(s) succeeded, {TotalFreedText} reclaimed.";
+            HasResult = true;
+            await _history.SaveOptimizationAsync(summary, cancellationToken);
+            var historyTask = LoadHistoryCoreAsync(
+                generation,
+                cancellationToken);
+            _loadHistoryTask = ActiveTaskTracker.Retain(
+                _loadHistoryTask,
+                historyTask);
+            await historyTask;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                SummaryText = $"Optimization error: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                IsRunning = false;
+                OptimizeCommand.NotifyCanExecuteChanged();
+            }
         }
     }
 
@@ -104,15 +181,49 @@ public partial class OptimizeViewModel : ObservableObject, INavigationAware
         Steps[index] = update;
     }
 
-    private async Task LoadHistoryAsync()
+    private async Task LoadHistoryAsync(
+        int generation,
+        NavigationLifecycleLease lease)
     {
-        RecentRuns.Clear();
-        var items = await _history.GetRecentOptimizationsAsync();
-        foreach (var item in items)
-        {
-            RecentRuns.Add(item);
-        }
-
-        HasHistory = RecentRuns.Count > 0;
+        using var lifecycleLease = lease;
+        await LoadHistoryCoreAsync(generation, lease.CancellationToken);
     }
+
+    private async Task LoadHistoryCoreAsync(
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var items = await _history.GetRecentOptimizationsAsync(
+                cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrent(generation, cancellationToken))
+            {
+                return;
+            }
+
+            RecentRuns.Clear();
+            foreach (var item in items)
+            {
+                RecentRuns.Add(item);
+            }
+
+            HasHistory = RecentRuns.Count > 0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+    }
+
+    private void RetireLifecycle()
+    {
+        Interlocked.Increment(ref _lifecycleGeneration);
+        Interlocked.Exchange(ref _lifecycle, null)?.Retire();
+    }
+
+    private bool IsCurrent(int generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _lifecycleGeneration);
 }

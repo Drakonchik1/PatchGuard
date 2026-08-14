@@ -37,7 +37,11 @@ public sealed class SystemOptimizerService : ISystemOptimizerService
             OptimizationStepResult result;
             try
             {
-                result = await step.RunAsync(cancellationToken);
+                result = step.RunsBlockingWork
+                    ? await Task.Run(
+                        () => step.RunAsync(cancellationToken),
+                        cancellationToken)
+                    : await step.RunAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {

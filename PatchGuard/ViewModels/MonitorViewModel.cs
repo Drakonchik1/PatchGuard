@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,17 +16,21 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
 {
     private static readonly TimeSpan SnapshotInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan AnomalyInterval = TimeSpan.FromSeconds(10);
+    private static readonly SemaphoreSlim CaptureGate = new(1, 1);
+    private static readonly SemaphoreSlim PersistenceGate = new(1, 1);
 
     private readonly IHardwareMonitorService _hardware;
     private readonly IAdminElevationService _elevation;
     private readonly ISensorHistoryService _sensorHistory;
     private readonly IAlertRuleEngine _alertRules;
     private readonly IAnomalyDetector _anomalyDetector;
-    private readonly DispatcherTimer _timer;
     private DateTime _lastSnapshotUtc = DateTime.MinValue;
     private DateTime _lastAnomalyUtc = DateTime.MinValue;
-    private int _persistGeneration;
-    private int _anomalyGeneration;
+    private NavigationLifecycle? _lifecycle;
+    private Task _monitorLoopTask = Task.CompletedTask;
+    private Task _persistenceTask = Task.CompletedTask;
+    private Task _anomalyTask = Task.CompletedTask;
+    private int _lifecycleGeneration;
 
     public MonitorViewModel(
         IHardwareMonitorService hardware,
@@ -40,10 +45,6 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         _alertRules = alertRules;
         _anomalyDetector = anomalyDetector;
         IsElevated = elevation.IsElevated;
-
-        // 2s strikes a balance between live feedback and a low CPU footprint.
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _timer.Tick += (_, _) => Refresh();
     }
 
     public ObservableCollection<SensorReading> Sensors { get; } = [];
@@ -103,19 +104,124 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
 
     public void OnNavigatedTo()
     {
-        Refresh();
-        _timer.Start();
+        OnNavigatedFrom();
+        var lifecycle = new NavigationLifecycle();
+        _lifecycle = lifecycle;
+        var generation = Interlocked.Increment(ref _lifecycleGeneration);
+        var dispatcher = CaptureOwningDispatcher();
+        if (lifecycle.TryAcquire(out var lease))
+        {
+            var loopTask = RunMonitorLoopAsync(
+                generation,
+                lifecycle,
+                lease!,
+                dispatcher);
+            _monitorLoopTask = ActiveTaskTracker.Retain(
+                _monitorLoopTask,
+                loopTask);
+        }
     }
 
-    public void OnNavigatedFrom() => _timer.Stop();
+    public void OnNavigatedFrom()
+    {
+        Interlocked.Increment(ref _lifecycleGeneration);
+        Interlocked.Exchange(ref _lifecycle, null)?.Retire();
+    }
 
     [RelayCommand]
     private void RunAsAdmin() => _elevation.RestartElevated();
 
-    private void Refresh()
+    private async Task RunMonitorLoopAsync(
+        int generation,
+        NavigationLifecycle lifecycle,
+        NavigationLifecycleLease lease,
+        Dispatcher? dispatcher)
     {
-        var s = _hardware.Capture();
+        using var lifecycleLease = lease;
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        var cancellationToken = lease.CancellationToken;
+        try
+        {
+            while (true)
+            {
+                try
+                {
+                    var snapshot = await CaptureSnapshotAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!IsCurrent(generation, cancellationToken))
+                    {
+                        return;
+                    }
 
+                    var alerts = _alertRules.Evaluate(snapshot);
+                    MaybePersistSnapshot(
+                        snapshot,
+                        generation,
+                        lifecycle);
+                    MaybeRefreshAnomalies(
+                        generation,
+                        lifecycle,
+                        dispatcher);
+                    await PostToUiAsync(
+                        dispatcher,
+                        () => ApplySnapshot(snapshot, alerts),
+                        generation,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    await TryPostStatusAsync(
+                        dispatcher,
+                        $"Monitor refresh failed: {ex.Message}",
+                        generation,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
+                if (!await timer.WaitForNextTickAsync(cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch (Exception ex)
+        {
+            await TryPostStatusAsync(
+                dispatcher,
+                $"Monitor stopped after an unexpected error: {ex.Message}",
+                generation,
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<HardwareSnapshot> CaptureSnapshotAsync(
+        CancellationToken cancellationToken)
+    {
+        await CaptureGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await Task.Run(_hardware.Capture).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return snapshot;
+        }
+        finally
+        {
+            CaptureGate.Release();
+        }
+    }
+
+    private void ApplySnapshot(HardwareSnapshot s, IReadOnlyList<Alert> alerts)
+    {
         MonitorUnavailable = s.MonitorUnavailable;
         SensorsLimited = s.SensorsLimited;
         StatusMessage = s.StatusMessage;
@@ -155,9 +261,7 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         }
 
         UpdateSensors(s.Sensors);
-        ApplyAlertSummary(_alertRules.Evaluate(s));
-        MaybePersistSnapshot(s);
-        MaybeRefreshAnomalies();
+        ApplyAlertSummary(alerts);
     }
 
     private void ApplyAlertSummary(IReadOnlyList<Alert> alerts)
@@ -178,7 +282,10 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         AlertDetailText = $"{top.Message} — {top.RecommendedAction}";
     }
 
-    private void MaybeRefreshAnomalies()
+    private void MaybeRefreshAnomalies(
+        int generation,
+        NavigationLifecycle lifecycle,
+        Dispatcher? dispatcher)
     {
         var now = DateTime.UtcNow;
         // First paint always scores; afterwards match snapshot cadence (~10s).
@@ -187,35 +294,60 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
             return;
         }
 
+        if (!_anomalyTask.IsCompleted ||
+            !lifecycle.TryAcquire(out var lease))
+        {
+            return;
+        }
+
         _lastAnomalyUtc = now;
-        var generation = Interlocked.Increment(ref _anomalyGeneration);
-        _ = RefreshAnomaliesAsync(generation);
+        _anomalyTask = RefreshAnomaliesAsync(
+            generation,
+            lease!,
+            dispatcher);
     }
 
-    private async Task RefreshAnomaliesAsync(int generation)
+    private async Task RefreshAnomaliesAsync(
+        int generation,
+        NavigationLifecycleLease lease,
+        Dispatcher? dispatcher)
     {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
         IReadOnlyList<AnomalyHit> hits = [];
         try
         {
-            var history = await _sensorHistory.GetRecentAsync(take: 120);
-            if (generation != Volatile.Read(ref _anomalyGeneration))
-            {
-                return;
-            }
-
-            hits = await Task.Run(() => _anomalyDetector.Detect(history));
+            var history = await _sensorHistory
+                .GetRecentAsync(take: 120, cancellationToken)
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            hits = _anomalyDetector.Detect(history);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
         }
         catch
         {
             // Anomaly scoring must not break the live monitor loop.
         }
 
-        if (generation != Volatile.Read(ref _anomalyGeneration))
+        try
         {
-            return;
+            await PostToUiAsync(
+                dispatcher,
+                () => ApplyAnomalySummary(hits),
+                generation,
+                cancellationToken).ConfigureAwait(false);
         }
-
-        ApplyAnomalySummary(hits);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch
+        {
+            // Dispatcher shutdown or a UI callback failure cannot fault this task.
+        }
     }
 
     private void ApplyAnomalySummary(IReadOnlyList<AnomalyHit> hits)
@@ -238,7 +370,10 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
         AnomalyDetailText = top.Explanation;
     }
 
-    private void MaybePersistSnapshot(HardwareSnapshot snapshot)
+    private void MaybePersistSnapshot(
+        HardwareSnapshot snapshot,
+        int generation,
+        NavigationLifecycle lifecycle)
     {
         if (snapshot.MonitorUnavailable)
         {
@@ -251,23 +386,125 @@ public partial class MonitorViewModel : ObservableObject, INavigationAware, INav
             return;
         }
 
+        if (!_persistenceTask.IsCompleted ||
+            !lifecycle.TryAcquire(out var lease))
+        {
+            return;
+        }
+
         _lastSnapshotUtc = now;
-        var generation = Interlocked.Increment(ref _persistGeneration);
-        _ = PersistSnapshotAsync(snapshot, generation);
+        _persistenceTask = PersistSnapshotAsync(
+            snapshot,
+            generation,
+            lease!);
     }
 
-    private async Task PersistSnapshotAsync(HardwareSnapshot snapshot, int generation)
+    private async Task PersistSnapshotAsync(
+        HardwareSnapshot snapshot,
+        int generation,
+        NavigationLifecycleLease lease)
     {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
+        var gateHeld = false;
         try
         {
-            await _sensorHistory.SaveSnapshotAsync(snapshot);
+            await PersistenceGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            gateHeld = true;
+            if (IsCurrent(generation, cancellationToken))
+            {
+                await _sensorHistory
+                    .SaveSnapshotAsync(snapshot, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
         }
         catch
         {
             // History failures must not break the live monitor loop.
         }
+        finally
+        {
+            if (gateHeld)
+            {
+                PersistenceGate.Release();
+            }
+        }
+    }
 
-        _ = generation;
+    private bool IsCurrent(int generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _lifecycleGeneration);
+
+    private async Task PostToUiAsync(
+        Dispatcher? dispatcher,
+        Action update,
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        if (!IsCurrent(generation, cancellationToken))
+        {
+            return;
+        }
+
+        if (dispatcher is null ||
+            dispatcher.HasShutdownStarted ||
+            dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        await dispatcher.InvokeAsync(
+            () =>
+            {
+                if (IsCurrent(generation, cancellationToken))
+                {
+                    update();
+                }
+            },
+            DispatcherPriority.DataBind,
+            cancellationToken);
+    }
+
+    private static Dispatcher? CaptureOwningDispatcher()
+    {
+        var applicationDispatcher = Application.Current?.Dispatcher;
+        if (applicationDispatcher is null ||
+            !applicationDispatcher.CheckAccess() ||
+            applicationDispatcher.HasShutdownStarted ||
+            applicationDispatcher.HasShutdownFinished)
+        {
+            return null;
+        }
+
+        return applicationDispatcher;
+    }
+
+    private async Task TryPostStatusAsync(
+        Dispatcher? dispatcher,
+        string message,
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PostToUiAsync(
+                dispatcher,
+                () => StatusMessage = message,
+                generation,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch
+        {
+            // Fail closed when the owning dispatcher is unavailable.
+        }
     }
 
     private void UpdateSensors(IReadOnlyList<SensorReading> readings)

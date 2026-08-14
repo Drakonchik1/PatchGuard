@@ -59,7 +59,11 @@ public sealed class DiagnosticOrchestrator : IDiagnosticOrchestrator
 
             try
             {
-                var findings = await module.RunAsync(cancellationToken);
+                var findings = module.RunsBlockingWork
+                    ? await Task.Run(
+                        () => module.RunAsync(cancellationToken),
+                        cancellationToken)
+                    : await module.RunAsync(cancellationToken);
                 allFindings.AddRange(findings);
                 item.Status = DiagnosticProgressStatus.Completed;
                 item.Message = findings.Count == 0

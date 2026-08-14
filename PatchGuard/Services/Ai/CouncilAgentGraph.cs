@@ -15,6 +15,8 @@ namespace PatchGuard.Services.Ai;
 /// </summary>
 public sealed class CouncilAgentGraph
 {
+    private const int MaxTranscriptCharacters = 12_000;
+
     private readonly SemanticKernelToolHost _toolHost;
 
     public CouncilAgentGraph(SemanticKernelToolHost toolHost)
@@ -39,7 +41,6 @@ public sealed class CouncilAgentGraph
         var nodesVisited = new List<string>();
         var timings = new List<CouncilTraceNodeTiming>();
         var messages = new List<CouncilMessage>();
-        var transcript = new List<(string Role, string Content)>();
         var webBlock = FormatWebResults(webResults);
         var kbBlock = KnowledgeRetrievalService.FormatHits(knowledgeHits);
         var usedToolPath = NeedsToolResearch(findings);
@@ -60,7 +61,6 @@ public sealed class CouncilAgentGraph
                 webBlock,
                 toolBlock,
                 messages,
-                transcript,
                 reporter,
                 cancellationToken);
         });
@@ -87,7 +87,6 @@ public sealed class CouncilAgentGraph
                     webBlock,
                     toolBlock,
                     messages,
-                    transcript,
                     reporter,
                     cancellationToken);
             });
@@ -104,7 +103,6 @@ public sealed class CouncilAgentGraph
                     webBlock,
                     toolBlock,
                     messages,
-                    transcript,
                     reporter,
                     cancellationToken);
             });
@@ -121,7 +119,6 @@ public sealed class CouncilAgentGraph
                     webBlock,
                     toolBlock,
                     messages,
-                    transcript,
                     reporter,
                     cancellationToken);
             });
@@ -413,11 +410,11 @@ public sealed class CouncilAgentGraph
         string webBlock,
         string toolBlock,
         List<CouncilMessage> messages,
-        List<(string Role, string Content)> transcript,
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
         reporter.SetPhase(phase, status);
+        var phaseTranscript = FormatTranscript(messages);
 
         foreach (var agent in CouncilAgents.Debaters)
         {
@@ -440,14 +437,13 @@ public sealed class CouncilAgentGraph
                 {webBlock}
 
                 Debate transcript:
-                {FormatTranscript(messages)}
+                {phaseTranscript}
                 """;
 
             var reply = await chat.CompleteAsync(
                 CouncilAgents.GetSystemPrompt(agent),
                 userPrompt,
-                transcript,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             var (headline, body) = SplitHeadline(reply);
             var message = new CouncilMessage
@@ -461,9 +457,6 @@ public sealed class CouncilAgentGraph
             };
 
             messages.Add(reporter.EmitMessage(message));
-            transcript.Add(("user", userPrompt));
-            transcript.Add(("assistant", reply));
-            await Task.Delay(150, cancellationToken);
         }
     }
 
@@ -480,10 +473,35 @@ public sealed class CouncilAgentGraph
         return (headline, body);
     }
 
-    private static string FormatTranscript(IReadOnlyList<CouncilMessage> messages) =>
-        messages.Count == 0
-            ? "(no debate yet)"
-            : string.Join("\n", messages.Select(m => $"[{m.Phase} R{m.Round} {m.AgentRole}]: {m.Content}"));
+    private static string FormatTranscript(IReadOnlyList<CouncilMessage> messages)
+    {
+        if (messages.Count == 0)
+        {
+            return "(no debate yet)";
+        }
+
+        var lines = new List<string>();
+        var remainingCharacters = MaxTranscriptCharacters;
+        for (var index = messages.Count - 1; index >= 0 && remainingCharacters > 0; index--)
+        {
+            var message = messages[index];
+            var prefix = $"[{message.Phase} R{message.Round} {message.AgentRole}]: ";
+            if (prefix.Length >= remainingCharacters)
+            {
+                break;
+            }
+
+            var contentLength = Math.Min(
+                message.Content.Length,
+                remainingCharacters - prefix.Length);
+            var line = prefix + message.Content[..contentLength];
+            lines.Add(line);
+            remainingCharacters -= line.Length + 1;
+        }
+
+        lines.Reverse();
+        return string.Join("\n", lines);
+    }
 
     private static string FormatWebResults(IReadOnlyList<WebSearchResult> results) =>
         results.Count == 0

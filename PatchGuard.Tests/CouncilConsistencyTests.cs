@@ -101,10 +101,13 @@ public sealed class CouncilConsistencyTests
         var openAi = new OpenAiChatClient(
             new HttpClient(new StubOpenAiHandler()),
             options);
+        var azure = new AzureOpenAiChatProvider(
+            new HttpClient(new StubOpenAiHandler()),
+            options);
         var ollama = new OllamaChatProvider(
             new HttpClient(new StubOpenAiHandler()),
             options);
-        var resolver = new ChatProviderResolver(openAi, ollama, options);
+        var resolver = new ChatProviderResolver(openAi, azure, ollama, options);
         return CouncilTestFactory.CreateCouncilService(
             resolver,
             new StubWebSearch(webResults),

@@ -10,7 +10,7 @@ public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -24,11 +24,22 @@ public partial class App : Application
         services.AddPatchGuard(configuration);
         _serviceProvider = services.BuildServiceProvider();
 
-        _serviceProvider
-            .GetRequiredService<DatabaseSchemaInitializer>()
-            .InitializeAsync()
-            .GetAwaiter()
-            .GetResult();
+        try
+        {
+            await _serviceProvider
+                .GetRequiredService<DatabaseSchemaInitializer>()
+                .InitializeAsync();
+        }
+        catch (Exception)
+        {
+            MessageBox.Show(
+                "PatchGuard could not initialize its local database. The application will close.",
+                "PatchGuard startup error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(-1);
+            return;
+        }
 
         var mainWindow = new MainWindow();
         var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();

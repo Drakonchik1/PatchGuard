@@ -13,7 +13,7 @@ public sealed class LocalCouncilSession
         _healthScorePolicy = healthScorePolicy;
     }
 
-    public async Task<RepairGuide> RunAsync(
+    public Task<RepairGuide> RunAsync(
         ScanScenario scenario,
         IReadOnlyList<Finding> findings,
         IReadOnlyList<WebSearchResult> webResults,
@@ -22,13 +22,13 @@ public sealed class LocalCouncilSession
         CouncilProgressReporter reporter,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var messages = new List<CouncilMessage>();
         var focusFindings = SelectFocusFindings(findings);
         var warnings = findings.Where(f => f.Severity >= FindingSeverity.Warning).ToList();
 
         // Phase 1 — independent analysis
         reporter.SetPhase(CouncilPhaseType.Analysis, "Council reviewing scan data…");
-        await Task.Delay(350, cancellationToken);
 
         foreach (var agent in CouncilAgents.Debaters)
         {
@@ -60,12 +60,10 @@ public sealed class LocalCouncilSession
                 Confidence = agent == CouncilAgents.Skeptic ? 62 : 74,
                 Content = content
             }));
-            await Task.Delay(280, cancellationToken);
         }
 
         // Phase 2 — research synthesis
         reporter.SetPhase(CouncilPhaseType.Research, "Cross-checking fixes from research…");
-        await Task.Delay(350, cancellationToken);
 
         foreach (var agent in CouncilAgents.Debaters)
         {
@@ -89,12 +87,10 @@ public sealed class LocalCouncilSession
                 Confidence = 68,
                 Content = content
             }));
-            await Task.Delay(280, cancellationToken);
         }
 
         // Phase 3 — debate round 1
         reporter.SetPhase(CouncilPhaseType.Debate, "Debate round 1 — positions clash…");
-        await Task.Delay(350, cancellationToken);
 
         var techAnalysis = messages.Last(m => m.AgentRole == CouncilAgents.Technician && m.Phase == CouncilPhaseType.Analysis);
         var skepticAnalysis = messages.Last(m => m.AgentRole == CouncilAgents.Skeptic && m.Phase == CouncilPhaseType.Analysis);
@@ -108,7 +104,6 @@ public sealed class LocalCouncilSession
             Confidence = 76,
             Content = $"Skeptic is right to question noise events, but disk/service warnings stay top priority. {Trim(techAnalysis.Content, 120)}"
         }));
-        await Task.Delay(250, cancellationToken);
 
         messages.Add(reporter.EmitMessage(new CouncilMessage
         {
@@ -119,7 +114,6 @@ public sealed class LocalCouncilSession
             Confidence = 71,
             Content = $"I'll veto any fix that needs admin or third-party cleaners. {Trim(skepticAnalysis.Content, 120)}"
         }));
-        await Task.Delay(250, cancellationToken);
 
         messages.Add(reporter.EmitMessage(new CouncilMessage
         {
@@ -130,11 +124,9 @@ public sealed class LocalCouncilSession
             Confidence = 73,
             Content = BuildDebateResearchPosition(focusFindings, webResults, knowledgeHits)
         }));
-        await Task.Delay(250, cancellationToken);
 
         // Phase 4 — rebuttal / convergence
         reporter.SetPhase(CouncilPhaseType.Rebuttal, "Debate round 2 — narrowing the plan…");
-        await Task.Delay(350, cancellationToken);
 
         messages.Add(reporter.EmitMessage(new CouncilMessage
         {
@@ -145,7 +137,6 @@ public sealed class LocalCouncilSession
             Confidence = 82,
             Content = BuildTechnicianFinal(focusFindings, warnings)
         }));
-        await Task.Delay(250, cancellationToken);
 
         messages.Add(reporter.EmitMessage(new CouncilMessage
         {
@@ -158,7 +149,6 @@ public sealed class LocalCouncilSession
                 ? "No objections — preventive baseline only. Do not install optional feature updates the same day as cumulative patches."
                 : "I accept the manual plan if we skip registry tweakers and service restarts without admin."
         }));
-        await Task.Delay(250, cancellationToken);
 
         messages.Add(reporter.EmitMessage(new CouncilMessage
         {
@@ -172,7 +162,6 @@ public sealed class LocalCouncilSession
 
         // Phase 5 — chief
         reporter.SetPhase(CouncilPhaseType.Verdict, "Chief Councilor synthesizing…");
-        await Task.Delay(400, cancellationToken);
         reporter.DeactivateAgents();
 
         var chiefVerdict = BuildChiefVerdict(scenario, findings, warnings, messages, webResults, knowledgeHits);
@@ -190,7 +179,7 @@ public sealed class LocalCouncilSession
 
         var references = WebReferenceMapper.FromSearchBundles(searchBundles);
         var kbReferences = KnowledgeRetrievalService.ToReferences(knowledgeHits);
-        return new RepairGuide
+        return Task.FromResult(new RepairGuide
         {
             Summary = summary,
             ChiefVerdict = chiefVerdict,
@@ -204,7 +193,7 @@ public sealed class LocalCouncilSession
                 hasAi: false,
                 hasWeb: references.Count > 0,
                 hasKnowledgeBase: kbReferences.Count > 0)
-        };
+        });
     }
 
     private static List<Finding> SelectFocusFindings(IReadOnlyList<Finding> findings) =>

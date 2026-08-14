@@ -9,9 +9,11 @@ public sealed class SensorHistoryService : ISensorHistoryService
 {
     /// <summary>Rolling window kept in SQLite for alerts / future ML.</summary>
     public static readonly TimeSpan DefaultRetention = TimeSpan.FromDays(7);
+    private static readonly TimeSpan RetentionSweepInterval = TimeSpan.FromHours(1);
 
     private readonly IDbContextFactory<PatchGuardDbContext> _dbContextFactory;
     private readonly TimeSpan _retention;
+    private long _nextRetentionSweepUtcTicks;
 
     public SensorHistoryService(
         IDbContextFactory<PatchGuardDbContext> dbContextFactory,
@@ -27,10 +29,11 @@ public sealed class SensorHistoryService : ISensorHistoryService
     {
         await using var dbContext =
             await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var now = DateTime.UtcNow;
 
         dbContext.SensorSnapshots.Add(new SensorSnapshotRecord
         {
-            CapturedAt = DateTime.UtcNow,
+            CapturedAt = now,
             CpuTemperatureC = snapshot.CpuTemperatureC,
             CpuLoadPercent = snapshot.CpuLoadPercent,
             GpuTemperatureC = snapshot.GpuTemperatureC,
@@ -39,12 +42,36 @@ public sealed class SensorHistoryService : ISensorHistoryService
             RamUsedGb = snapshot.RamUsedGb
         });
 
-        var cutoff = DateTime.UtcNow - _retention;
-        await dbContext.SensorSnapshots
-            .Where(r => r.CapturedAt < cutoff)
-            .ExecuteDeleteAsync(cancellationToken);
+        if (TryScheduleRetentionSweep(now))
+        {
+            var cutoff = now - _retention;
+            await dbContext.SensorSnapshots
+                .Where(r => r.CapturedAt < cutoff)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private bool TryScheduleRetentionSweep(DateTime nowUtc)
+    {
+        while (true)
+        {
+            var scheduledTicks = Volatile.Read(ref _nextRetentionSweepUtcTicks);
+            if (scheduledTicks > nowUtc.Ticks)
+            {
+                return false;
+            }
+
+            var nextTicks = nowUtc.Add(RetentionSweepInterval).Ticks;
+            if (Interlocked.CompareExchange(
+                    ref _nextRetentionSweepUtcTicks,
+                    nextTicks,
+                    scheduledTicks) == scheduledTicks)
+            {
+                return true;
+            }
+        }
     }
 
     public async Task<IReadOnlyList<SensorSnapshotRecord>> GetRecentAsync(

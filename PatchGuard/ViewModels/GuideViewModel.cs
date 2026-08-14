@@ -33,6 +33,10 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     private readonly IGuidedFixPlanService _fixPlans;
     private readonly IUserConfirmationService _confirmation;
     private CancellationTokenSource? _councilCts;
+    private NavigationLifecycle? _lifecycle;
+    private Task _councilTask = Task.CompletedTask;
+    private Task _fixTask = Task.CompletedTask;
+    private int _lifecycleGeneration;
 
     public GuideViewModel(
         INavigationService navigation,
@@ -46,6 +50,8 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         _aiCouncil = aiCouncil;
         _fixPlans = fixPlans;
         _confirmation = confirmation;
+        _lifecycle = new NavigationLifecycle();
+        _lifecycleGeneration = 1;
 
         AgentPanels =
         [
@@ -116,6 +122,9 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
 
     public void OnNavigatedTo()
     {
+        RetireLifecycle();
+        _lifecycle = new NavigationLifecycle();
+        Interlocked.Increment(ref _lifecycleGeneration);
         ResetUi();
         LoadScanMetrics();
 
@@ -133,31 +142,71 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     public void OnNavigatedFrom()
     {
         _councilCts?.Cancel();
+        RetireLifecycle();
         IsCouncilRunning = false;
+        IsFixRunning = false;
         RunCouncilCommand.NotifyCanExecuteChanged();
+        RunSafeFixCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanRunCouncil))]
-    private async Task RunCouncilAsync()
+    private Task RunCouncilAsync()
     {
+        if (_lifecycle is null)
+        {
+            return Task.CompletedTask;
+        }
+
         ResetUi();
 
         if (_session.SelectedScenario is not ScanScenario scenario)
         {
             ErrorMessage = "No scan scenario selected.";
-            return;
+            return Task.CompletedTask;
         }
 
         LoadScanMetrics();
+        _councilCts?.Cancel();
         IsCouncilRunning = true;
         RunCouncilCommand.NotifyCanExecuteChanged();
-        _councilCts?.Cancel();
-        using var councilCts = new CancellationTokenSource();
+        if (_lifecycle is not { } lifecycle ||
+            !lifecycle.TryAcquire(out var lease))
+        {
+            IsCouncilRunning = false;
+            RunCouncilCommand.NotifyCanExecuteChanged();
+            return Task.CompletedTask;
+        }
+
+        var generation = Volatile.Read(ref _lifecycleGeneration);
+        var councilTask = RunCouncilCoreAsync(
+            scenario,
+            generation,
+            lease!);
+        _councilTask = ActiveTaskTracker.Retain(
+            _councilTask,
+            councilTask);
+        return councilTask;
+    }
+
+    private async Task RunCouncilCoreAsync(
+        ScanScenario scenario,
+        int generation,
+        NavigationLifecycleLease lease)
+    {
+        using var lifecycleLease = lease;
+        using var councilCts = CancellationTokenSource.CreateLinkedTokenSource(
+            lease.CancellationToken);
         _councilCts = councilCts;
 
         try
         {
-            var progress = new Progress<CouncilProgressUpdate>(HandleProgress);
+            var progress = new Progress<CouncilProgressUpdate>(update =>
+            {
+                if (IsCurrent(generation, councilCts.Token))
+                {
+                    HandleProgress(update);
+                }
+            });
 
             var guide = await _aiCouncil.BuildGuideAsync(
                 scenario,
@@ -166,6 +215,10 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
                 councilCts.Token,
                 HasExternalAiConsent);
             councilCts.Token.ThrowIfCancellationRequested();
+            if (!IsCurrent(generation, councilCts.Token))
+            {
+                return;
+            }
 
             _session.Guide = guide;
             ApplyGuide(guide);
@@ -173,21 +226,30 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         }
         catch (OperationCanceledException)
         {
-            ErrorMessage = "AI guidance cancelled. No system changes were made.";
+            if (IsCurrent(generation, CancellationToken.None))
+            {
+                ErrorMessage = "AI guidance cancelled. No system changes were made.";
+            }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Council failed: {ex.Message}";
+            if (IsCurrent(generation, councilCts.Token))
+            {
+                ErrorMessage = $"Council failed: {ex.Message}";
+            }
         }
         finally
         {
-            IsCouncilRunning = false;
-            HasExternalAiConsent = false;
-            RunCouncilCommand.NotifyCanExecuteChanged();
-            CouncilStatus = string.Empty;
-            foreach (var panel in AgentPanels)
+            if (IsCurrent(generation, CancellationToken.None))
             {
-                panel.IsActive = false;
+                IsCouncilRunning = false;
+                HasExternalAiConsent = false;
+                RunCouncilCommand.NotifyCanExecuteChanged();
+                CouncilStatus = string.Empty;
+                foreach (var panel in AgentPanels)
+                {
+                    panel.IsActive = false;
+                }
             }
 
             if (ReferenceEquals(_councilCts, councilCts))
@@ -328,10 +390,13 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
             SourceLabels.Add(source switch
             {
                 GuidanceSource.Local => "Local diagnostic data",
-                GuidanceSource.AiGenerated =>
-                    string.Equals(guide.AiProviderName, OllamaChatProvider.ProviderName, StringComparison.OrdinalIgnoreCase)
-                        ? "Local LLM (Ollama)"
-                        : "AI-generated advice",
+                GuidanceSource.AiGenerated => guide.AiProviderName?.ToUpperInvariant() switch
+                {
+                    "OLLAMA" => "Local LLM (Ollama)",
+                    "AZURE" => "Azure OpenAI advice",
+                    "OPENAI" => "AI-generated advice",
+                    _ => "AI-generated advice"
+                },
                 GuidanceSource.WebSourced => "Web-sourced research",
                 GuidanceSource.KnowledgeBase => "Local knowledge base",
                 _ => "Source unavailable"
@@ -407,11 +472,13 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
     }
 
     [RelayCommand(CanExecute = nameof(CanRunFix))]
-    private async Task RunSafeFixAsync(FixStepItemViewModel? item)
+    private Task RunSafeFixAsync(FixStepItemViewModel? item)
     {
-        if (item is null || !item.CanRunSafeFix)
+        if (item is null ||
+            !item.CanRunSafeFix ||
+            _lifecycle is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var scenario = _session.SelectedScenario?.GetTitle();
@@ -419,7 +486,7 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         if (plan is null)
         {
             FixStatusMessage = "No safe automated fix is available for this guide step.";
-            return;
+            return Task.CompletedTask;
         }
 
         var preview = _fixPlans.Preview(plan);
@@ -431,25 +498,63 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
         if (!_confirmation.Confirm("Confirm guided fix", confirmMessage))
         {
             FixStatusMessage = "Fix cancelled. No system changes were made.";
-            return;
+            return Task.CompletedTask;
         }
 
         IsFixRunning = true;
         RunSafeFixCommand.NotifyCanExecuteChanged();
         FixStatusMessage = "Running safe fix…";
-        try
-        {
-            var result = await _fixPlans.ExecuteAsync(plan, GuidedFixConfirmation.ConfirmNow());
-            FixStatusMessage = result.Summary;
-        }
-        catch (Exception ex)
-        {
-            FixStatusMessage = $"Guided fix failed: {ex.Message}";
-        }
-        finally
+        if (_lifecycle is not { } lifecycle ||
+            !lifecycle.TryAcquire(out var lease))
         {
             IsFixRunning = false;
             RunSafeFixCommand.NotifyCanExecuteChanged();
+            return Task.CompletedTask;
+        }
+
+        var generation = Volatile.Read(ref _lifecycleGeneration);
+        var fixTask = RunSafeFixCoreAsync(plan, generation, lease!);
+        _fixTask = ActiveTaskTracker.Retain(_fixTask, fixTask);
+        return fixTask;
+    }
+
+    private async Task RunSafeFixCoreAsync(
+        GuidedFixPlan plan,
+        int generation,
+        NavigationLifecycleLease lease)
+    {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
+        try
+        {
+            var result = await _fixPlans.ExecuteAsync(
+                plan,
+                GuidedFixConfirmation.ConfirmNow(),
+                cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsCurrent(generation, cancellationToken))
+            {
+                FixStatusMessage = result.Summary;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                FixStatusMessage = $"Guided fix failed: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (IsCurrent(generation, cancellationToken))
+            {
+                IsFixRunning = false;
+                RunSafeFixCommand.NotifyCanExecuteChanged();
+            }
         }
     }
 
@@ -510,4 +615,14 @@ public partial class GuideViewModel : ObservableObject, INavigationAware, INavig
 
     [RelayCommand]
     private void Done() => _navigation.NavigateHome();
+
+    private void RetireLifecycle()
+    {
+        Interlocked.Increment(ref _lifecycleGeneration);
+        Interlocked.Exchange(ref _lifecycle, null)?.Retire();
+    }
+
+    private bool IsCurrent(int generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _lifecycleGeneration);
 }

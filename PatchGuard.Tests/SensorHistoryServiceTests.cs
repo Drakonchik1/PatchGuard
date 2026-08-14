@@ -65,6 +65,30 @@ public sealed class SensorHistoryServiceTests
     }
 
     [Fact]
+    public async Task SaveSnapshot_DoesNotRunRetentionAgainWithinAnHour()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new SensorHistoryService(database.Factory, TimeSpan.FromHours(1));
+        await service.SaveSnapshotAsync(new HardwareSnapshot { CpuLoadPercent = 10 });
+
+        await using (var context = await database.Factory.CreateDbContextAsync())
+        {
+            context.SensorSnapshots.Add(new Data.Entities.SensorSnapshotRecord
+            {
+                CapturedAt = DateTime.UtcNow.AddHours(-3),
+                CpuLoadPercent = 20
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await service.SaveSnapshotAsync(new HardwareSnapshot { CpuLoadPercent = 30 });
+
+        var recent = await service.GetRecentAsync(20);
+        Assert.Equal(3, recent.Count);
+        Assert.Contains(recent, record => record.CpuLoadPercent == 20);
+    }
+
+    [Fact]
     public async Task ConcurrentSaves_UseIndependentContexts()
     {
         await using var database = await TestDatabase.CreateAsync();

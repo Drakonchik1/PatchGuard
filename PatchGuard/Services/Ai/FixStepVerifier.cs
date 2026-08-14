@@ -9,6 +9,12 @@ namespace PatchGuard.Services.Ai;
 /// </summary>
 public static partial class FixStepVerifier
 {
+    private static readonly HashSet<string> AllowedCopyTexts =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "services.msc"
+        };
+
     private static readonly string[] ForbiddenPhrases =
     [
         "dism ",
@@ -45,7 +51,7 @@ public static partial class FixStepVerifier
         {
             var json = ExtractJson(chiefRaw);
             using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("steps", out var stepsElement) ||
+            if (!TryGetProperty(doc.RootElement, "steps", out var stepsElement) ||
                 stepsElement.ValueKind != JsonValueKind.Array)
             {
                 return StepVerificationResult.Valid();
@@ -59,8 +65,9 @@ public static partial class FixStepVerifier
                 var title = GetString(step, "title") ?? $"Step {index}";
                 var instructions = GetString(step, "instructions") ?? string.Empty;
                 var linkUrl = GetString(step, "linkUrl");
+                var copyText = GetString(step, "copyText");
 
-                foreach (var reason in DescribeUnsafe(title, instructions, linkUrl))
+                foreach (var reason in DescribeUnsafe(title, instructions, linkUrl, copyText))
                 {
                     reasons.Add($"Step {index} ({title}): {reason}");
                 }
@@ -77,7 +84,11 @@ public static partial class FixStepVerifier
         }
     }
 
-    public static IEnumerable<string> DescribeUnsafe(string title, string instructions, string? linkUrl)
+    public static IEnumerable<string> DescribeUnsafe(
+        string title,
+        string instructions,
+        string? linkUrl,
+        string? copyText = null)
     {
         var haystack = $"{title}\n{instructions}";
         foreach (var phrase in ForbiddenPhrases)
@@ -98,15 +109,40 @@ public static partial class FixStepVerifier
         {
             yield return $"unsafe linkUrl '{linkUrl}'";
         }
+
+        if (!string.IsNullOrWhiteSpace(copyText) &&
+            !AllowedCopyTexts.Contains(copyText.Trim()))
+        {
+            yield return $"unsafe copyText '{copyText}'";
+        }
     }
 
     public static bool IsSafe(FixStep step) =>
-        !DescribeUnsafe(step.Title, step.Instructions, step.LinkUrl).Any();
+        !DescribeUnsafe(step.Title, step.Instructions, step.LinkUrl, step.CopyText).Any();
 
-    private static string? GetString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+    private static string? GetString(JsonElement element, string name)
+    {
+        return TryGetProperty(element, name, out var value) &&
+               value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+    }
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        value = default;
+        var found = false;
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                found = true;
+            }
+        }
+
+        return found;
+    }
 
     private static string ExtractJson(string text)
     {

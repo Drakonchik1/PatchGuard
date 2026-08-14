@@ -2,9 +2,9 @@
 
 How optional AI guidance works: local RAG, provider routing, multi-agent graph, verification, and evaluation.
 
-**Related:** [AI_ROADMAP.md](AI_ROADMAP.md) · [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md) · [OLLAMA_SETUP.md](OLLAMA_SETUP.md) · [SPRINT_PLAN.md](SPRINT_PLAN.md)
+**Related:** [AI_ROADMAP.md](AI_ROADMAP.md) · [AI_EVAL_BASELINE.md](AI_EVAL_BASELINE.md) · [OLLAMA_SETUP.md](OLLAMA_SETUP.md) · [CLOUD_ARCHITECTURE.md](CLOUD_ARCHITECTURE.md) · [SPRINT_PLAN.md](SPRINT_PLAN.md)
 
-**Last updated:** 2026-08-13 (Sprint 5)
+**Last updated:** 2026-08-13 (Sprint 6)
 
 ---
 
@@ -31,6 +31,7 @@ flowchart TD
     subgraph Providers["IChatCompletionProvider"]
         OLL[OllamaChatProvider]
         OAI[OpenAiChatClient]
+        AZ[AzureOpenAiChatProvider]
     end
 
     subgraph External["External — consent required"]
@@ -44,10 +45,11 @@ flowchart TD
     KB -->|KnowledgeHit[] hybrid| Core
     Core --> RES
     RES -->|null Rules| RULES
-    RES -->|Ollama / OpenAI| GRAPH
+    RES -->|Ollama / OpenAI / Azure| GRAPH
     GRAPH -->|CouncilTrace + verified steps| RG[RepairGuide]
     GRAPH --> OLL
     GRAPH --> OAI
+    GRAPH --> AZ
     Core -->|allowExternalServices| TAV
     TAV -->|WebSearchResult[]| Core
     RULES --> RG
@@ -59,21 +61,22 @@ flowchart TD
 **Privacy defaults**
 
 - KB retrieval and Rules/Ollama run **without** external consent.
-- OpenAI + Tavily require consent checkbox; payloads pass through `ExternalDiagnosticSanitizer`.
-- Settings choice is local-only (`%LocalAppData%\PatchGuard\user-settings.json`).
+- OpenAI / Azure + Tavily require consent checkbox; payloads pass through `ExternalDiagnosticSanitizer`.
+- Settings choice is local-only (`%LocalAppData%\PatchGuard\user-settings.json`); API keys use DPAPI under `secrets\` (see [CLOUD_ARCHITECTURE.md](CLOUD_ARCHITECTURE.md)).
 
 ---
 
 ## Settings — provider radio
 
-Settings UI exposes **Cloud (OpenAI) / Ollama / Rules** (persisted). Runtime still honors per-request consent for Cloud.
+Settings UI exposes **Cloud (OpenAI) / Azure OpenAI / Ollama / Rules** (persisted). Runtime still honors per-request consent for cloud providers.
 
 | Mode | Resolves to | Leaves machine? | Consent |
 |------|-------------|-----------------|---------|
 | `Rules` | `null` → `LocalCouncilSession` | No | No |
 | `Ollama` | `OllamaChatProvider` | No (localhost) | No |
 | `OpenAI` (Cloud) | `OpenAiChatClient` | Yes | Yes |
-| `Auto` (appsettings default) | OpenAI if key + consent, else Ollama if enabled, else Rules | Depends | For cloud |
+| `Azure` | `AzureOpenAiChatProvider` | Yes | Yes |
+| `Auto` (appsettings default) | Azure → OpenAI → Ollama → Rules | Depends | For cloud |
 
 ```mermaid
 flowchart LR

@@ -193,9 +193,39 @@ public sealed class AiPrivacyAndProvenanceTests
 
     [Theory]
     [InlineData("https://example.com/path", true)]
-    [InlineData("http://example.com/path", true)]
+    [InlineData("https://support.example.com/path", true)]
+    [InlineData("https://8.8.8.8/path", true)]
+    [InlineData("https://[2606:4700:4700::1111]/path", true)]
+    [InlineData("http://example.com/path", false)]
+    [InlineData("https://intranet/path", false)]
+    [InlineData("https://foo_bar.example.com/path", false)]
+    [InlineData("https://-foo.example.com/path", false)]
+    [InlineData("https://foo-.example.com/path", false)]
+    [InlineData("https://foo..example.com/path", false)]
+    [InlineData("https://example.com./path", false)]
+    [InlineData("https://localhost/path", false)]
+    [InlineData("https://localhost./path", false)]
+    [InlineData("https://subdomain.localhost/path", false)]
+    [InlineData("https://router.local/path", false)]
+    [InlineData("https://service.internal/path", false)]
+    [InlineData("https://example.test/path", false)]
+    [InlineData("https://example.invalid/path", false)]
+    [InlineData("https://host.example/path", false)]
+    [InlineData("https://site.onion/path", false)]
+    [InlineData("https://127.0.0.1/path", false)]
+    [InlineData("https://127.0.0.1./path", false)]
+    [InlineData("https://10.0.0.1/path", false)]
+    [InlineData("https://172.16.0.1/path", false)]
+    [InlineData("https://192.168.1.1/path", false)]
+    [InlineData("https://169.254.1.1/path", false)]
+    [InlineData("https://[::1]/path", false)]
+    [InlineData("https://[::2]/path", false)]
+    [InlineData("https://[fe80::1]/path", false)]
+    [InlineData("https://[fe80::1%251]/path", false)]
+    [InlineData("https://[fd00::1]/path", false)]
     [InlineData("file:///C:/secret.txt", false)]
     [InlineData("javascript:alert(1)", false)]
+    [InlineData("https://@example.com", false)]
     [InlineData("https://user:password@example.com", false)]
     [InlineData("not a url", false)]
     public void ExternalUrlPolicyAllowsOnlySafeWebLinks(string url, bool expected) =>
@@ -210,10 +240,11 @@ public sealed class AiPrivacyAndProvenanceTests
     {
         options ??= new AiOptions { ApiKey = "configured", Model = "test-model" };
         var openAi = new OpenAiChatClient(new HttpClient(handler), options);
+        var azure = new AzureOpenAiChatProvider(new HttpClient(new RejectingHandler()), options);
         var ollama = new OllamaChatProvider(
             new HttpClient(ollamaHandler ?? new CapturingOllamaHandler()),
             options);
-        var resolver = new ChatProviderResolver(openAi, ollama, options);
+        var resolver = new ChatProviderResolver(openAi, azure, ollama, options);
         return CouncilTestFactory.CreateCouncilService(
             resolver,
             search,
@@ -324,6 +355,14 @@ public sealed class AiPrivacyAndProvenanceTests
             {
                 Content = new StringContent("boom", Encoding.UTF8, "text/plain")
             });
+    }
+
+    private sealed class RejectingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException($"Unexpected HTTP call: {request.RequestUri}");
     }
 
     private sealed class NoOpCouncilEvaluationService : ICouncilEvaluationService

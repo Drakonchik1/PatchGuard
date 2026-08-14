@@ -9,11 +9,15 @@ using PatchGuard.Services.Platform;
 
 namespace PatchGuard.ViewModels;
 
-public partial class FpsViewModel : ObservableObject, INavigationAware
+public partial class FpsViewModel : ObservableObject, INavigationAware, INavigationLeave
 {
     private readonly IFpsCaptureService _fps;
     private readonly IPerformanceHistoryService _history;
     private readonly IAdminElevationService _elevation;
+    private NavigationLifecycle? _lifecycle;
+    private Task _loadHistoryTask = Task.CompletedTask;
+    private Task _captureTask = Task.CompletedTask;
+    private int _lifecycleGeneration;
 
     public FpsViewModel(
         IFpsCaptureService fps,
@@ -49,6 +53,10 @@ public partial class FpsViewModel : ObservableObject, INavigationAware
 
     public void OnNavigatedTo()
     {
+        RetireLifecycle();
+        var lifecycle = new NavigationLifecycle();
+        _lifecycle = lifecycle;
+        var generation = Interlocked.Increment(ref _lifecycleGeneration);
         IsAvailable = _fps.IsAvailable;
         IsElevated = _elevation.IsElevated;
         StatusMessage = IsAvailable
@@ -56,7 +64,19 @@ public partial class FpsViewModel : ObservableObject, INavigationAware
             : _fps.UnavailableReason
               ?? "PresentMon was not found. Add PresentMon-x64.exe to Tools\\PresentMon (see README.txt) to capture real game FPS.";
         RefreshProcesses();
-        _ = LoadHistoryAsync();
+        if (lifecycle.TryAcquire(out var lease))
+        {
+            _loadHistoryTask = ActiveTaskTracker.Retain(
+                _loadHistoryTask,
+                LoadHistoryAsync(generation, lease!));
+        }
+    }
+
+    public void OnNavigatedFrom()
+    {
+        RetireLifecycle();
+        IsCapturing = false;
+        CaptureCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
@@ -76,21 +96,44 @@ public partial class FpsViewModel : ObservableObject, INavigationAware
     private void RunAsAdmin() => _elevation.RestartElevated();
 
     [RelayCommand(CanExecute = nameof(CanCapture))]
-    private async Task CaptureAsync()
+    private Task CaptureAsync()
     {
-        if (SelectedProcess is not { } target)
+        if (SelectedProcess is not { } target ||
+            _lifecycle is not { } lifecycle ||
+            !lifecycle.TryAcquire(out var lease))
         {
-            return;
+            return Task.CompletedTask;
         }
 
+        var generation = Volatile.Read(ref _lifecycleGeneration);
         IsCapturing = true;
         CaptureCommand.NotifyCanExecuteChanged();
         HasResult = false;
         StatusMessage = $"Capturing {target.ProcessName} for {SelectedSeconds}s — keep the game in focus and rendering…";
+        var captureTask = CaptureCoreAsync(target, generation, lease!);
+        _captureTask = ActiveTaskTracker.Retain(_captureTask, captureTask);
+        return captureTask;
+    }
 
+    private async Task CaptureCoreAsync(
+        GameProcessInfo target,
+        int generation,
+        NavigationLifecycleLease lease)
+    {
+        using var lifecycleLease = lease;
+        var cancellationToken = lease.CancellationToken;
         try
         {
-            var result = await _fps.CaptureAsync(target, SelectedSeconds);
+            var result = await _fps.CaptureAsync(
+                target,
+                SelectedSeconds,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrent(generation, cancellationToken))
+            {
+                return;
+            }
+
             if (result.Success)
             {
                 ResultTitle = result.ProcessName;
@@ -100,22 +143,38 @@ public partial class FpsViewModel : ObservableObject, INavigationAware
                 ResultDetail = result.Message;
                 HasResult = true;
                 StatusMessage = null;
-                await _history.SaveFpsAsync(result);
-                await LoadHistoryAsync();
+                await _history.SaveFpsAsync(result, cancellationToken);
+                var historyTask = LoadHistoryCoreAsync(
+                    generation,
+                    cancellationToken);
+                _loadHistoryTask = ActiveTaskTracker.Retain(
+                    _loadHistoryTask,
+                    historyTask);
+                await historyTask;
             }
             else
             {
                 StatusMessage = result.Message;
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
         catch (Exception ex)
         {
-            StatusMessage = $"Capture failed: {ex.Message}";
+            if (IsCurrent(generation, cancellationToken))
+            {
+                StatusMessage = $"Capture failed: {ex.Message}";
+            }
         }
         finally
         {
-            IsCapturing = false;
-            CaptureCommand.NotifyCanExecuteChanged();
+            if (IsCurrent(generation, cancellationToken))
+            {
+                IsCapturing = false;
+                CaptureCommand.NotifyCanExecuteChanged();
+            }
         }
     }
 
@@ -124,15 +183,49 @@ public partial class FpsViewModel : ObservableObject, INavigationAware
     partial void OnSelectedProcessChanged(GameProcessInfo? value) => CaptureCommand.NotifyCanExecuteChanged();
     partial void OnIsAvailableChanged(bool value) => CaptureCommand.NotifyCanExecuteChanged();
 
-    private async Task LoadHistoryAsync()
+    private async Task LoadHistoryAsync(
+        int generation,
+        NavigationLifecycleLease lease)
     {
-        RecentCaptures.Clear();
-        var items = await _history.GetRecentFpsAsync();
-        foreach (var item in items)
-        {
-            RecentCaptures.Add(item);
-        }
-
-        HasHistory = RecentCaptures.Count > 0;
+        using var lifecycleLease = lease;
+        await LoadHistoryCoreAsync(generation, lease.CancellationToken);
     }
+
+    private async Task LoadHistoryCoreAsync(
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var items = await _history.GetRecentFpsAsync(
+                cancellationToken: cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrent(generation, cancellationToken))
+            {
+                return;
+            }
+
+            RecentCaptures.Clear();
+            foreach (var item in items)
+            {
+                RecentCaptures.Add(item);
+            }
+
+            HasHistory = RecentCaptures.Count > 0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Navigation lifecycle cancellation is expected.
+        }
+    }
+
+    private void RetireLifecycle()
+    {
+        Interlocked.Increment(ref _lifecycleGeneration);
+        Interlocked.Exchange(ref _lifecycle, null)?.Retire();
+    }
+
+    private bool IsCurrent(int generation, CancellationToken cancellationToken) =>
+        !cancellationToken.IsCancellationRequested
+        && generation == Volatile.Read(ref _lifecycleGeneration);
 }

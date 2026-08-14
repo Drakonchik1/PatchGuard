@@ -5,7 +5,10 @@ namespace PatchGuard.Services.History;
 
 public interface ISensorHistoryService
 {
-    /// <summary>Persists a numeric snapshot and prunes rows older than retention.</summary>
+    /// <summary>
+    /// Persists a numeric snapshot. Implementations may prune expired rows on a
+    /// coarse cadence rather than on every sample.
+    /// </summary>
     Task SaveSnapshotAsync(HardwareSnapshot snapshot, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SensorSnapshotRecord>> GetRecentAsync(

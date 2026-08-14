@@ -76,16 +76,18 @@ requirement, risk, and verification status.
 
 ### AI guidance (optional)
 
-Four-agent council (Technician, Skeptic, Researcher, Chief) with three backends:
+Four-agent council (Technician, Skeptic, Researcher, Chief) with these backends:
 
 | Backend | Needs cloud key? | Needs consent checkbox? | Notes |
 |---------|------------------|-------------------------|--------|
 | **Rules** | No | No | Deterministic offline council |
 | **Ollama** (local LLM) | No | No | Same debate loop via localhost |
-| **OpenAI** + optional Tavily | Yes | Yes | Cloud; sanitized categories only |
+| **OpenAI** + optional Tavily | Yes (DPAPI) | Yes | Cloud; sanitized categories only |
+| **Azure OpenAI** | Yes (DPAPI) | Yes | Same `IChatCompletionProvider` seam |
+| **AWS Bedrock** | — | — | **Stub only** — not wired; see [CLOUD_ARCHITECTURE.md](docs/CLOUD_ARCHITECTURE.md) |
 
 **RAG:** local playbooks under `PatchGuard/KnowledgeBase/Playbooks` are retrieved before
-guidance. Guide UI shows provenance labels (local / Local LLM (Ollama) / AI / web / KB)
+guidance. Guide UI shows provenance labels (local / Local LLM (Ollama) / AI / Azure / web / KB)
 and inspectable references. Fix-step links are limited to safe http(s) / `ms-settings:`.
 
 ### Change the local model
@@ -98,7 +100,27 @@ Full steps: [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md).
 
 ### API keys (optional cloud)
 
-Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Development.json` (gitignored):
+Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Development.json` (gitignored).
+On first launch, keys in config are **migrated into Windows DPAPI** under
+`%LocalAppData%\PatchGuard\secrets\` — clear them from the JSON afterward so they do not stay plaintext in the repo tree.
+
+Azure (Settings UI or config):
+
+```json
+{
+  "AzureOpenAI": {
+    "Endpoint": "https://YOUR_RESOURCE.openai.azure.com/",
+    "Deployment": "your-chat-deployment",
+    "ApiKey": "your-azure-key",
+    "ApiVersion": "2024-06-01"
+  },
+  "Ai": {
+    "ChatProvider": "Azure"
+  }
+}
+```
+
+OpenAI / Tavily example:
 
 ```json
 {
@@ -121,7 +143,8 @@ Copy `PatchGuard/appsettings.example.json` → `PatchGuard/appsettings.Developme
 }
 ```
 
-`Ai:ChatProvider`: `Auto` | `OpenAI` | `Ollama` | `Rules`.
+`Ai:ChatProvider`: `Auto` | `OpenAI` | `Azure` | `Ollama` | `Rules`.
+**Auto order:** Azure → OpenAI → Ollama → Rules (cloud needs consent).
 
 ## Stack
 
@@ -135,6 +158,9 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 - Default: normal user; UAC only when you choose elevation.
 - PresentMon: Intel-signed binary required in Tools folder.
 - External links and AI payloads validated before use.
+- **Ollama:** loopback only (`localhost`, `127.0.0.1`, `[::1]`); remote Ollama endpoints are rejected.
+- **Azure OpenAI:** HTTPS + official Azure OpenAI host suffixes only (`*.openai.azure.com`, `*.services.ai.azure.com`); endpoint is re-read on each request.
+- **Cloud chat HTTP:** providers stream with `ResponseHeadersRead` and reject bodies over **1 MB**.
 - Local Ollama traffic stays on the machine; cloud calls still require consent.
 
 ## Documentation
@@ -147,6 +173,7 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) | Sprint-by-sprint build plan (one chat = one sprint) |
 | [docs/OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) | Install Ollama / switch models |
 | [docs/AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) | Council, RAG, providers, agent graph |
+| [docs/CLOUD_ARCHITECTURE.md](docs/CLOUD_ARCHITECTURE.md) | Hybrid desktop, Azure, DPAPI, Bedrock stub |
 | [docs/AI_EVAL_BASELINE.md](docs/AI_EVAL_BASELINE.md) | Eval metrics + golden baseline |
 | [docs/AI_EVAL_RESULTS.md](docs/AI_EVAL_RESULTS.md) | Provider comparison worksheet |
 
@@ -157,11 +184,11 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | Sprint | Focus | Status |
 |--------|-------|--------|
 | 1 | CI + golden×10 + architecture doc | ✅ |
-| 2 | Sensor history + alerts | ⬜ |
-| 3 | Guided fixes + alerts UI | ⬜ |
-| 4 | Classic ML (inference-only) | ⬜ |
-| 5 | AI polish (settings, trace, RAG) | ⬜ |
-| 6 | Azure + secrets | ⬜ |
+| 2 | Sensor history + alerts | ✅ |
+| 3 | Guided fixes + alerts UI | ✅ |
+| 4 | Classic ML (inference-only) | ✅ |
+| 5 | AI polish (settings, trace, RAG) | ✅ |
+| 6 | Azure + secrets | ✅ |
 | 7 | Quality loop + portfolio | ⬜ |
 | 8 | UX optimization + settings | ⬜ |
 
@@ -170,6 +197,6 @@ Intel PresentMon · OpenAI HTTP · Ollama HTTP · Tavily search · local RAG · 
 | Track | Done |
 |-------|------|
 | UX Phase 1–2 | Foundation + diagnostic journey |
-| AI Phase 0–3 | Metrics, RAG, Ollama, agentic graph |
+| AI Phase 0–5 | Metrics, RAG, Ollama, agentic graph, ML, Azure + DPAPI |
 
 Details: [docs/UX_ROADMAP.md](docs/UX_ROADMAP.md) · [docs/AI_ROADMAP.md](docs/AI_ROADMAP.md) · [HANDOFF.md](HANDOFF.md)

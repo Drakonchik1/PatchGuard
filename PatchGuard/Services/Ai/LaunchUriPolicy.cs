@@ -1,7 +1,7 @@
 namespace PatchGuard.Services.Ai;
 
 /// <summary>
-/// Validates URIs before opening them from the UI. Allows http(s) web links and
+/// Validates URIs before opening them from the UI. Allows HTTPS web links and
 /// a narrow ms-settings: page prefix for built-in Windows Settings shortcuts.
 /// </summary>
 public static class LaunchUriPolicy

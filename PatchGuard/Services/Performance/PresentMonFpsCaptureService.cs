@@ -75,6 +75,7 @@ public sealed class PresentMonFpsCaptureService : IFpsCaptureService
         int seconds,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_executable.Value.Path is not { } exePath)
         {
             return FpsCaptureResult.Failed(
@@ -110,13 +111,24 @@ public sealed class PresentMonFpsCaptureService : IFpsCaptureService
             var stderr = new System.Text.StringBuilder();
             process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderr.AppendLine(e.Data); };
 
+            // Revalidate at the last possible point before execution to narrow
+            // the window in which a previously verified binary could be replaced.
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!AuthenticodeVerifier.IsTrusted(exePath, ExpectedPublisher))
+            {
+                return FpsCaptureResult.Failed(
+                    target.ProcessName,
+                    "PresentMon signature verification failed immediately before launch.");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
             if (!process.Start())
             {
                 return FpsCaptureResult.Failed(target.ProcessName, "Failed to start PresentMon.");
             }
 
             process.BeginErrorReadLine();
-            _ = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(seconds + 15));
@@ -130,6 +142,13 @@ public sealed class PresentMonFpsCaptureService : IFpsCaptureService
                 TryKill(process);
                 return FpsCaptureResult.Failed(target.ProcessName, "Capture timed out. Make sure the game is rendering frames.");
             }
+            catch (OperationCanceledException)
+            {
+                TryKill(process);
+                throw;
+            }
+
+            await outputTask;
 
             if (!File.Exists(csvPath))
             {
@@ -141,6 +160,10 @@ public sealed class PresentMonFpsCaptureService : IFpsCaptureService
             }
 
             return ParseCsv(csvPath, target.ProcessName);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

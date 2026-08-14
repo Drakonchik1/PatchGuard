@@ -3,7 +3,44 @@
 **Branch:** `main` (feature work may land on topic branches first) · **Remote:** `origin/main`  
 **Build plan:** [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) — **one Cursor chat = one sprint**
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-14
+
+## Active work — security/performance hardening
+
+Continue from:
+`docs/superpowers/plans/2026-08-14-security-performance-hardening.md`
+
+**Do not reset, stage, or commit:** the working tree contains Sprint 6 plus reviewed
+hardening changes.
+
+Completed and task-reviewed:
+
+1. **Cloud boundaries:** Azure HTTPS + official subdomains + current endpoint per
+   request; Ollama loopback-only; public HTTPS link policy; `CopyText` verification.
+   Focused tests reported **126/126**.
+2. **Storage/process safety:** atomic DPAPI/settings writes; corrupt-secret validation;
+   reparse-safe temp cleanup; canonical system executable paths; cancellation
+   propagation; PresentMon reverify-before-launch. Focused tests **26/26**.
+3. **Dependency/startup:** EF Core SQLite **10.0.11** → SQLitePCLRaw **2.1.12**;
+   vulnerable package audit clean; async DB startup; default concurrent workstation
+   GC restored. Full tests at this checkpoint **309/309**.
+4. **UI responsiveness/lifecycle:** background non-overlapping monitor capture,
+   dispatcher-only updates, sequential diagnostics/optimizer off UI thread, bounded
+   navigation history, lifecycle cancellation leases, hourly sensor retention.
+   Focused tests **62/62**; latest full run before final lifecycle polish **326/326**.
+5. **AI latency + HTTP bounds:** bounded per-phase council transcript (no recursive
+   `PriorTurns` duplication), service-layer artificial delays removed, shared
+   `BoundedHttpResponse` (1 MB) with `ResponseHeadersRead` on OpenAI/Azure/Ollama.
+   Focused tests **119/119**.
+
+Remaining:
+
+_(none — hardening plan complete; working tree uncommitted.)_
+
+**Final verification (2026-08-14):** build ✅ · tests **336/336** ✅ · NuGet audit clean ✅ · lints clean ✅ · `git diff --check` clean after trailing-space fix.
+
+Known residual/deferred scope: DNS rebinding for public hostnames, separate privileged
+helper, full history-database encryption, major PresentMon parser redesign.
 
 ## What shipped
 
@@ -14,13 +51,15 @@
 - Sprint 3: real Alerts UI, Monitor inline alert banner, guided-fix pipeline (preview → confirm → execute → verify → record).
 - Sprint 4: Monitor ML anomaly banner; `AnomalyDiagnosticModule` findings with confidence %.
 - Sprint 5: Settings provider radio (Cloud/Ollama/Rules); Guide collapsible agent trace.
+- Sprint 6: Azure OpenAI radio + endpoint/deployment fields; DPAPI secrets (not plain JSON).
 
 ### AI competencies
 - Phase 0: golden eval harness (**15** fixtures), `CouncilEvaluator`, `CouncilEvaluationRecord`, baseline docs + CI >5% drop gate.
 - Phase 1 RAG: local playbook KB (**16** playbooks), hybrid keyword+embedding retrieval, KnowledgeBase provenance (offline embeddings).
-- Phase 2 Local LLM: Ollama via `IChatCompletionProvider`, Settings radio Cloud/Ollama/Rules, default **`llama3.2:3b`**.
+- Phase 2 Local LLM: Ollama via `IChatCompletionProvider`, Settings radio, default **`llama3.2:3b`**.
 - Phase 3 Agentic: `CouncilAgentGraph` (conditional path) + SK read-only tools + `DetailedExplanation` + `VerifySteps` (1 retry) + `CouncilTrace`.
 - Phase 4 Classic ML: Z-score + Isolation Forest (bundled) + Microsoft.ML RandomizedPCA; inference-only.
+- Phase 5 Cloud: `AzureOpenAiChatProvider`, DPAPI secrets, `docs/CLOUD_ARCHITECTURE.md`, `BedrockChatProvider` stub.
 
 ### Sprint 1 (done)
 - GitHub Actions CI (`.github/workflows/ci.yml`)
@@ -55,9 +94,16 @@
 - Golden fixtures **15**; baseline averages **94.4% / 96.7%**; CI threshold step
 - `docs/AI_ARCHITECTURE.md` updated
 
+### Sprint 6 (done)
+- `AzureOpenAiChatProvider` + Settings Azure fields
+- `ChatProviderResolver` Auto order: Azure → OpenAI → Ollama → Rules
+- `ISecretStorageService` / `DpapiSecretStorageService` + migrate from appsettings
+- `docs/CLOUD_ARCHITECTURE.md`; `BedrockChatProvider` stub (not in Auto)
+- Mock HTTP + secret round-trip tests
+
 ### Docs & security
-- `docs/SPRINT_PLAN.md`, `docs/AI_ROADMAP.md`, `docs/UX_ROADMAP.md`, `docs/OLLAMA_SETUP.md`, `docs/ML_REPORT.md`
-- Security: launch URI policy, EF factory, sanitizer allowlist, navigation fixes; agent tools remain read-only.
+- `docs/SPRINT_PLAN.md`, `docs/AI_ROADMAP.md`, `docs/UX_ROADMAP.md`, `docs/OLLAMA_SETUP.md`, `docs/ML_REPORT.md`, `docs/CLOUD_ARCHITECTURE.md`
+- Security: launch URI policy, EF factory, sanitizer allowlist, navigation fixes; agent tools remain read-only; API keys via DPAPI.
 
 ## Run
 
@@ -67,8 +113,9 @@ dotnet run --project PatchGuard/PatchGuard.csproj
 dotnet test PatchGuard.Tests/PatchGuard.Tests.csproj
 ```
 
-Leave `OpenAI:ApiKey` empty → AI guidance without consent uses Ollama + KB when enabled.  
-Provider switch: Settings UI (or `docs/OLLAMA_SETUP.md`).  
+Leave `OpenAI:ApiKey` empty → AI guidance without consent uses Ollama + KB when enabled.
+
+Provider switch: Settings UI (or `docs/OLLAMA_SETUP.md` / `docs/CLOUD_ARCHITECTURE.md`).
 ML regen (offline only): `$env:PATCHGUARD_REGEN_ML='1'` + filter `RegenBundledModels`.
 
 ## Sprint progress
@@ -80,7 +127,7 @@ ML regen (offline only): `$env:PATCHGUARD_REGEN_ML='1'` + filter `RegenBundledMo
 | 3 | Guided fixes + alerts UI | ✅ |
 | 4 | Classic ML (inference-only) | ✅ |
 | 5 | AI polish (settings, trace, hybrid RAG) | ✅ |
-| 6 | Azure + DPAPI secrets | ⬜ |
+| 6 | Azure + DPAPI secrets | ✅ |
 | 7 | Quality loop + portfolio | ⬜ |
 | 8 | UX optimization + settings full | ⬜ |
 
@@ -88,13 +135,12 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 
 ## Next sprint
 
-**Sprint 6** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) (Azure + DPAPI secrets).
+**Sprint 7** — copy CHAT PROMPT from [docs/SPRINT_PLAN.md](docs/SPRINT_PLAN.md) (quality loop + portfolio).
 
 ## Remaining gaps (by sprint)
 
 | Gap | Sprint |
 |-----|--------|
-| Azure OpenAI + secrets | 6 |
 | Demo script, controlled experiment | 7 |
 | Gaming Mode, settings full, history compare | 8 |
 | n8n KB reindex export | 7 (optional) |
@@ -104,6 +150,7 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 | Area | Path |
 |------|------|
 | Sprint plan | `docs/SPRINT_PLAN.md` |
+| Cloud / secrets | `docs/CLOUD_ARCHITECTURE.md`, `Services/Security/`, `AzureOpenAiChatProvider.cs` |
 | ML anomaly | `PatchGuard/Services/Ml/`, `docs/ML_REPORT.md` |
 | Sensor history | `PatchGuard/Services/History/SensorHistoryService.cs` |
 | Alert rules | `PatchGuard/Services/Alerts/AlertRuleEngine.cs` |
@@ -111,7 +158,7 @@ Mark ✅ in `docs/SPRINT_PLAN.md` when a sprint closes.
 | Guided fixes | `PatchGuard/Services/Fixes/GuidedFixPlanService.cs` |
 | AI architecture | `docs/AI_ARCHITECTURE.md` |
 | Eval results | `docs/AI_EVAL_RESULTS.md` |
-| Chat providers | `PatchGuard/Services/Ai/IChatCompletionProvider.cs`, `OllamaChatProvider.cs`, `OpenAiChatClient.cs` |
+| Chat providers | `PatchGuard/Services/Ai/IChatCompletionProvider.cs`, `OllamaChatProvider.cs`, `OpenAiChatClient.cs`, `AzureOpenAiChatProvider.cs` |
 | Agentic graph | `PatchGuard/Services/Ai/CouncilAgentGraph.cs`, `SemanticKernelToolHost.cs` |
 | Step verify | `PatchGuard/Services/Ai/FixStepVerifier.cs` |
 | Trace | `PatchGuard/Models/CouncilTrace.cs` |
